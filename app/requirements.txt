@@ -1,0 +1,23 @@
+torch
+torchaudio
+numpy
+scipy
+soundfile
+librosa
+mido
+mutagen
+PySide6
+sounddevice
+requests
+yt-dlp
+Pillow
+psutil
+scikit-learn
+transformers==4.44.2
+accelerate
+audio-separator[gpu]
+beat_this @ https://github.com/CPJKU/beat_this/archive/main.zip
+mt3-infer
+audioread
+torchcrepe
+pyphen

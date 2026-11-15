@@ -1,0 +1,98 @@
+CHARTER - Charts jugables para YARG y Clone Hero a partir de tus canciones
+==========================================================================
+
+INSTALAR (solo la primera vez)
+  1. Doble clic en "Instalar Charter.bat".
+     - Comprueba tu tarjeta NVIDIA y su driver (no hace falta instalar CUDA aparte:
+       PyTorch trae su propio CUDA dentro de la carpeta).
+     - Descarga Python, las librerias, ffmpeg y los modelos de IA (unos 12-15 GB).
+     - TODO se guarda dentro de esta carpeta. Para desinstalar, borra la carpeta y listo.
+
+USAR
+  1. Doble clic en "Charter.bat".
+  2. Arrastra tus canciones (mp3, flac, wav, m4a...) a la ventana, o pulsa "Anadir de YouTube...",
+     pega uno o varios enlaces (uno por linea), elige "Musica y video" (el video queda de fondo) o
+     "Solo la musica" y pulsa "Anadir a las descargas". Se bajan de una en una y cada una pasa a la
+     lista al terminar. Puedes anadir mas enlaces mientras tanto, cada tanda con su opcion.
+  3. (Opcional) Selecciona una cancion para cambiar titulo/artista, poner portada
+     o elegir un video de fondo (archivo o enlace de YouTube) y ajustar su desfase.
+  4. Elige la carpeta de salida (por ejemplo, la carpeta de canciones de YARG).
+  5. Pulsa "Generar charts".
+     - La consola de abajo muestra en todo momento lo que esta haciendo.
+     - Arriba a la derecha veras el tiempo estimado de la cancion y de toda la cola.
+     - "Pausar" cierra el proceso y libera la tarjeta grafica por completo (para jugar
+       o usar el PC). "Reanudar" sigue donde se quedo.
+     - Si cierras el programa, se cancela lo que no haya terminado.
+  6. Cuando termine, "Abrir visualizador" para ver y oir el chart como en el juego.
+
+QUE GENERA
+  AHORA MISMO GUITARRA, BAJO, BATERIA (modelo neuronal), VOZ Y TECLADO. Voz: letra y notas para cantar en YARG (su voz va en vocals.ogg).
+  Teclado: 5 carriles y Pro Keys (teclas de verdad), solo si la cancion tiene teclado; su modelo
+  dice donde van las notas y que teclas son, y las partes repetidas se tocan igual (va en keys.ogg).
+  Guitarra: una sola, aunque suenen dos (la pista de guitarra entera, como
+  la chartean los oficiales). Las partes que se repiten (estribillos, riffs) se tocan igual
+  cada vez, como en los charts oficiales. Los golpes del bajo que la IA deja colarse en la
+  guitarra no se convierten en notas, y los rasgueos que se dejan sonar duran hasta que se apagan. Para cambiar los instrumentos, en config\ajustes.json:
+      "instrumentos": ["guitar", "bass", "drums", "keys", "vocals"]
+  (lo de abajo es lo que genera con todos activados)
+  Una carpeta "Artista - Titulo" con:
+    notes.mid   guitarra, bajo,
+                bateria Pro (platillos/toms, doble bombo en Expert+), teclado y
+                Pro Keys (solo si la cancion tiene teclado) y voz (YARG),
+                en Facil, Medio, Dificil y Experto, con Star Power, solos y secciones.
+    song.ogg + guitar.ogg, bass.ogg, drums.ogg, vocals.ogg (y keys.ogg si hay teclado)
+                (si fallas notas, se silencia tu instrumento, como en el juego original)
+    album.png   portada (del archivo, de internet o la que pongas tu)
+    video.mp4   video de fondo (si lo eliges), preparado para que YARG lo reproduzca
+    song.ini    datos de la cancion
+
+COMO FUNCIONA (resumen)
+  - Separacion de pistas: varios modelos RoFormer combinados (voz x3, instrumentos x2
+    pasadas, voz principal/coros, y la bateria pieza a pieza).
+  - Tempo y compases: Beat This! (3 modelos combinados).
+  - Notas: YourMT3+ con 4 pasadas por instrumento; una nota solo entra si aparece en
+    varias pasadas Y tiene energia real en la pista separada (evita notas inventadas y
+    notas largas falsas por restos de la separacion). La duracion de las notas largas
+    se mide en el audio, no se adivina.
+  - Experto "jugable": densidad, acordes y acordes de 3 notas limitados a lo que hacen
+    los charts oficiales (calibrado con tus canciones de referencia).
+  - Dificil/Medio/Facil: modelo aprendido de charts oficiales (Harmonix/Neversoft).
+  - Voz: letra de internet (LRCLIB) o Whisper si no se encuentra; alineada palabra a
+    palabra, separada en silabas, tono con CREPE; lo hablado/gritado va sin tono.
+
+ENTRENAR CON TU BIBLIOTECA (por ejemplo tus 6000 canciones)
+  Boton "Entrenar con mi biblioteca de canciones...": eliges la carpeta y cuantas horas
+  como maximo (por ejemplo 4-5). Solo se leen tus archivos.
+    - De TODOS los charts (.mid y .chart) aprende densidad, acordes, HOPOs, star power y
+      como se simplifica a Dificil/Medio/Facil.
+    - De los que traen pistas separadas (guitar.ogg, bass.ogg...) aprende que golpes del
+      audio son notas y cuando poner acordes.
+    - Opcional (recomendado): la IA separa las canciones sin pistas y vuelve a separar las que
+      si las traen, para aprender con el mismo tipo de audio que vera al generar. Usa la GPU,
+      unos 30-45 s por cancion, y aprovecha todas las horas que le des.
+    - Con la separacion por IA tambien guarda el espectrograma de cada guitarra, y de las
+      canciones que traen guitar.ogg saca otro con la guitarra original (mas un poco del resto
+      de la cancion, para que suene como una separada por la IA; unos segundos por cancion).
+      Al final entrena con todos el modelo neuronal de notas (unas 2,5 h con la GPU), que
+      decide donde van las notas, los acordes, los botones y que notas quedan en cada
+      dificultad. Solo se queda si mejora al anterior. Cuantas mas guitarras, mejor.
+    - Si la biblioteca esta en un disco USB y este se desconecta un momento al leer mucho,
+      espera a que vuelva y sigue; si tarda demasiado, esas canciones no se pierden: se
+      reintentan en el siguiente entrenamiento.
+    - Al generar se usan juntos el modelo nuevo y los de los dos entrenamientos anteriores (si
+      son del mismo tamano): la media de los tres acierta mas que cada uno solo.
+  "Sin limite": analiza todo lo que haya (puede tardar dias) y luego entrena.
+  "Terminar ya y entrenar": deja de analizar y entrena con lo analizado hasta ese momento.
+  "Parar": para del todo sin entrenar.
+  Lo analizado se guarda en config/entrenamiento: si lo paras, la proxima vez sigue (y no
+  repite lo ya hecho, ni el modelo de dificultades si las canciones no han cambiado).
+  "Volver a lo de serie" deshace lo aprendido.
+  Un 2 % de tus canciones (siempre las mismas) se aparta y no se usa para entrenar: sirven
+  para medir de verdad lo bien que lo hace el programa con canciones que no ha visto:
+    runtime\venv\Scripts\python.exe -m charter.calibration.benchmark 12
+  (con PYTHONPATH=app; usa la GPU, unos 8 min por cancion; resultado en salida_eval).
+
+REGENERAR
+  Las canciones terminadas guardan lo pesado (separacion y transcripcion) mientras el
+  programa este abierto. "Regenerar" rehace el chart en un par de minutos (por ejemplo
+  despues de entrenar).

@@ -1,0 +1,14 @@
+# Solo se sube el programa: todo lo demas (canciones, charts de otros, datos de entrenamiento,
+# modelos descargados, entorno de Python) se queda en este PC.
+/*
+!/.gitignore
+!/README.md
+!/LICENSE
+!/LEEME.txt
+!/Charter.bat
+!/Instalar Charter.bat
+!/app/
+!/instalador/
+
+__pycache__/
+*.pyc
