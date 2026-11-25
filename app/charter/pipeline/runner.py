@@ -509,6 +509,27 @@ def _two_guitar_parts(left, right, log):
 
 
 # ===================================================================== voz
+LOST_LEAD_DB = 10.0  # la principal 10 dB por debajo de la voz completa = el separador la ha mandado a los coros
+
+
+def _lead_with_lost_parts(lead: np.ndarray, full: np.ndarray, sr: int = SR) -> np.ndarray:
+    """Voz principal, salvo en los tramos (0,5 s) donde casi no suena pero la voz completa si: ahi, la completa."""
+    n = min(len(lead), len(full))
+    lead, full = lead[:n], full[:n]
+    hop = sr // 2
+    m = n // hop
+    if m < 2:
+        return lead
+    db = lambda a: 20 * np.log10(np.sqrt((a[: m * hop].reshape(m, hop) ** 2).mean(axis=1)) + 1e-9)
+    dl, df = db(lead), db(full)
+    lost = (df > np.percentile(df, 95) - 25) & (dl < df - LOST_LEAD_DB)
+    if not lost.any():
+        return lead
+    g = np.convolve(np.repeat(lost.astype(np.float32), hop), np.ones(hop // 4, np.float32) / (hop // 4), "same")
+    g = np.pad(g, (0, n - len(g)))  # fundido de 125 ms en los bordes
+    return lead + g * (full - lead)
+
+
 def _vocals_analysis(stems, meta, cfg: JobConfig, online: bool, rep: Reporter, check_pause) -> dict:
     import librosa
 
@@ -522,7 +543,10 @@ def _vocals_analysis(stems, meta, cfg: JobConfig, online: bool, rep: Reporter, c
         log("No se detecta voz: la cancion es instrumental")
         return {"present": False}
     lead_m = lead.mean(axis=0)
-    v16 = librosa.resample(lead_m, orig_sr=SR, target_sr=16000).astype(np.float32)
+    # Whisper y el alineador escuchan la voz principal + los coros donde el separador se ha llevado la principal a
+    # los coros (idea de un probador); el tono (CREPE) sigue saliendo solo de la principal
+    words_m = _lead_with_lost_parts(lead_m, load(stems["vocals"])[0].mean(axis=0)) if "vocals" in stems else lead_m
+    v16 = librosa.resample(words_m, orig_sr=SR, target_sr=16000).astype(np.float32)
     lyr = None
     if cfg.lyrics_text.strip():
         lyr = Lyrics([Line(l.strip()) for l in cfg.lyrics_text.splitlines() if l.strip()], "usuario")

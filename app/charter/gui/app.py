@@ -150,6 +150,23 @@ class MainWindow(QMainWindow):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._refresh_total)
         self.timer.start(1000)
+        QTimer.singleShot(0, self._show_rules)
+
+    def _show_rules(self):
+        if self.settings.get("normas_aceptadas"):
+            return
+        r = QMessageBox.information(
+            self, "Normas de uso",
+            "Los charts que genera Charter son solo para tu uso personal.\n\n"
+            "No puedes publicarlos, subirlos ni repartirlos de ninguna forma, ni gratis: "
+            "ni webs de charts, ni Discord, ni Reddit, ni foros, ni enlaces, ni packs.\n\n"
+            "Usa solo canciones que tengas derecho a usar. Condiciones completas en LICENSE.",
+            QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Ok)
+        if r != QMessageBox.Ok:
+            self.close()
+            return
+        self.settings["normas_aceptadas"] = True
+        save_settings(self.settings)
 
     # ------------------------------------------------------------ interfaz
     def _build(self):

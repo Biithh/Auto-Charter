@@ -246,7 +246,27 @@ def hits_from_audio(y: np.ndarray, sr: int) -> list[tuple[float, int, float]] | 
         for f, t in zip(fr, no.peak_times(pr[:, k], fr)):
             out.append((float(t), k, float(pr[f, k])))
     out.sort()
-    return out
+    return _single_toms(out)
+
+
+TOM_CLS = (2, 4, 6)
+DOUBLE_TOM_KEEP = 0.8  # 24-11: sin esto el 37 % de los toms salian en doble (charts reales 6,7 %); con 0,8 queda en 6 %
+
+
+def _single_toms(hits: list[tuple[float, int, float]]) -> list[tuple[float, int, float]]:
+    """Dos toms distintos a la vez casi siempre es el modelo dudando de color: se queda el mas probable."""
+    toms = [i for i, h in enumerate(hits) if h[1] in TOM_CLS]
+    drop = set()
+    for a, b in zip(toms, toms[1:]):
+        if hits[b][0] - hits[a][0] <= 0.04 and hits[a][1] != hits[b][1]:
+            weak = a if hits[a][2] < hits[b][2] else b
+            if hits[weak][2] < DOUBLE_TOM_KEEP:
+                drop.add(weak)
+    return [h for i, h in enumerate(hits) if i not in drop]
+
+
+assert _single_toms([(1.0, 2, 0.6), (1.01, 4, 0.9), (2.0, 2, 0.9), (2.0, 4, 0.85)]) == \
+    [(1.01, 4, 0.9), (2.0, 2, 0.9), (2.0, 4, 0.85)]
 
 
 if __name__ == "__main__":

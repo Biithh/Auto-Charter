@@ -1,3 +1,3 @@
 """Charter: genera charts jugables para YARG / Clone Hero a partir de canciones."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

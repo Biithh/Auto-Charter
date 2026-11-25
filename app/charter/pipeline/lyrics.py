@@ -306,8 +306,11 @@ class Aligner:
         rms = np.sqrt((seg.reshape(n, hop) ** 2).mean(axis=1) + 1e-12)
         db = 20 * np.log10(rms + 1e-9)
         silent = db < max(np.percentile(db, 95) - 32, np.percentile(db, 10) + 3)
-        from scipy.ndimage import binary_erosion
+        from scipy.ndimage import binary_dilation, binary_erosion
 
+        # 24-11: al final de un videoclip cortado sobraban letras y el alineador las ponia en el silencio de los
+        # creditos ("do-" 14 s, "lor" 18 s): una letra fuera de la voz (+-0,3 s) no cuenta para el tiempo de su palabra
+        voiced = binary_dilation(~silent, np.ones(2 * int(0.3 / frame_dur) + 1))
         silent = binary_erosion(silent, np.ones(5))  # margen en los bordes de cada frase
         em = em.copy()
         mask = np.ones(em.shape[1], bool)
@@ -340,7 +343,9 @@ class Aligner:
         for wi, w in enumerate(words):
             if wi not in spans:
                 continue
-            fr = spans[wi]
+            fr = [f for f in spans[wi] if voiced[f]]
+            if not fr:
+                continue  # la palabra entera cae donde no se canta
             out.append(Word(w, t0 + min(fr) * frame_dur, t0 + (max(fr) + 1) * frame_dur, float(np.mean(scores[wi]))))
         return out
 
