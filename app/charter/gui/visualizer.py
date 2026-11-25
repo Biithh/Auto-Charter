@@ -36,11 +36,12 @@ from ..chart.midi_io import read_midi, resolve_hopos, write_midi
 from ..chart.model import DIFFICULTIES, DIFF_NAMES_ES, OPEN, RES, Chart
 from .player import MultiTrackPlayer
 from .theme import LANE_COLORS, OPEN_COLOR, PANEL, REVIEW_COLOR, SP_COLOR
+from ..i18n import t as tr
 
-TRACKS = [("guitar", "Guitarra"), ("rhythm", "Rítmica"), ("bass", "Bajo"), ("drums", "Batería"),
-          ("keys", "Teclado"), ("pro_keys", "Pro Keys"), ("vocals", "Voz")]
-STEMS = [("song", "Resto"), ("guitar", "Guitarra"), ("bass", "Bajo"), ("drums", "Batería"),
-         ("keys", "Teclado"), ("vocals", "Voz"), ("rhythm", "Rítmica"), ("crowd", "Público")]
+TRACKS = [("guitar", tr("Guitarra")), ("rhythm", tr("Rítmica")), ("bass", tr("Bajo")), ("drums", tr("Batería")),
+          ("keys", tr("Teclado")), ("pro_keys", "Pro Keys"), ("vocals", tr("Voz"))]
+STEMS = [("song", tr("Resto")), ("guitar", tr("Guitarra")), ("bass", tr("Bajo")), ("drums", tr("Batería")),
+         ("keys", tr("Teclado")), ("vocals", tr("Voz")), ("rhythm", tr("Rítmica")), ("crowd", tr("Público"))]
 DRUM_COLORS = ["#ff8c1a", "#e8383d", "#f2d22e", "#3d8ff2", "#2ecc52"]
 
 
@@ -75,7 +76,7 @@ class Highway(QWidget):
         self._note_rects = []
         if self.chart is None:
             p.setPen(QColor("#777"))
-            p.drawText(self.rect(), Qt.AlignCenter, "Sin chart cargado")
+            p.drawText(self.rect(), Qt.AlignCenter, tr("Sin chart cargado"))
             return
         if self.track == "vocals":
             self._paint_vocals(p)
@@ -466,7 +467,7 @@ class Highway(QWidget):
         p.drawText(QRectF(bx, strike - 68, 100, 40), Qt.AlignCenter, f"{streak}")
         p.setFont(QFont("Segoe UI", 9))
         p.setPen(QColor("#b0b0c0"))
-        p.drawText(QRectF(bx, strike - 34, 100, 18), Qt.AlignCenter, "RACHA")
+        p.drawText(QRectF(bx, strike - 34, 100, 18), Qt.AlignCenter, tr("RACHA"))
         p.setFont(QFont("Segoe UI", 16, QFont.Bold))
         p.setPen(QColor(["#ffffff", "#ffd23f", "#4ec27a", "#b45cff"][mult - 1]))
         p.drawText(QRectF(bx, strike - 18, 100, 30), Qt.AlignCenter, f"x{mult}")
@@ -569,7 +570,7 @@ class VisualizerWindow(QWidget):
     def __init__(self, song_dir: str | Path, parent=None):
         super().__init__(parent, Qt.Window)
         self.song_dir = Path(song_dir)
-        self.setWindowTitle(f"Visualizador - {self.song_dir.name}")
+        self.setWindowTitle(tr(f"Visualizador - {self.song_dir.name}"))
         self.resize(1180, 820)
         self.setObjectName("root")
         self.player = MultiTrackPlayer()
@@ -596,20 +597,20 @@ class VisualizerWindow(QWidget):
                 self.track_cb.addItem(name, key)
         self.diff_cb = QComboBox()
         for d in reversed(DIFFICULTIES):
-            self.diff_cb.addItem(DIFF_NAMES_ES[d], d)
+            self.diff_cb.addItem(tr(DIFF_NAMES_ES[d]), d)
         self.track_cb.currentIndexChanged.connect(self._change_view)
         self.diff_cb.currentIndexChanged.connect(self._change_view)
-        top.addWidget(QLabel("Instrumento:"))
+        top.addWidget(QLabel(tr("Instrumento:")))
         top.addWidget(self.track_cb)
-        top.addWidget(QLabel("Dificultad:"))
+        top.addWidget(QLabel(tr("Dificultad:")))
         top.addWidget(self.diff_cb)
         top.addStretch()
         self.speed_cb = QComboBox()
-        for s in ("Rápida", "Normal", "Lenta"):
+        for s in (tr("Rápida"), "Normal", tr("Lenta")):
             self.speed_cb.addItem(s)
         self.speed_cb.setCurrentIndex(1)
         self.speed_cb.currentIndexChanged.connect(self._change_speed)
-        top.addWidget(QLabel("Velocidad de notas:"))
+        top.addWidget(QLabel(tr("Velocidad de notas:")))
         top.addWidget(self.speed_cb)
         left.addLayout(top)
         self.highway = Highway()
@@ -618,7 +619,7 @@ class VisualizerWindow(QWidget):
         self.highway.noteClicked.connect(self._note_clicked)
         left.addWidget(self.highway, 1)
         ctr = QHBoxLayout()
-        self.play_btn = QPushButton("▶  Reproducir")
+        self.play_btn = QPushButton(tr("▶  Reproducir"))
         self.play_btn.setObjectName("primary")
         self.play_btn.clicked.connect(self._toggle)
         self.slider = QSlider(Qt.Horizontal)
@@ -630,7 +631,7 @@ class VisualizerWindow(QWidget):
         ctr.addWidget(self.time_lbl)
         left.addLayout(ctr)
         mute = QHBoxLayout()
-        mute.addWidget(QLabel("Pistas:"))
+        mute.addWidget(QLabel(tr("Pistas:")))
         self.mute_boxes = {}
         names = dict(STEMS)
         for key in self._audio_files():
@@ -645,16 +646,16 @@ class VisualizerWindow(QWidget):
             self.mute_boxes[key] = cb
         mute.addStretch()
         left.addLayout(mute)
-        hint = QLabel("Espacio: reproducir/pausar · Rueda del ratón: avanzar/retroceder · Clic en una nota y Supr: quitarla")
+        hint = QLabel(tr("Espacio: reproducir/pausar · Rueda del ratón: avanzar/retroceder · Clic en una nota y Supr: quitarla"))
         hint.setObjectName("subtitle")
         left.addWidget(hint)
         root.addLayout(left, 3)
 
         right = QVBoxLayout()
-        t = QLabel("Resumen del chart")
+        t = QLabel(tr("Resumen del chart"))
         t.setStyleSheet("font-size: 13pt; font-weight: 700;")
         right.addWidget(t)
-        self.save_btn = QPushButton("Guardar cambios")
+        self.save_btn = QPushButton(tr("Guardar cambios"))
         self.save_btn.setObjectName("primary")
         self.save_btn.setEnabled(False)
         self.save_btn.clicked.connect(self._save)
@@ -693,11 +694,11 @@ class VisualizerWindow(QWidget):
             obj = getattr(self.chart, k)
             if obj.has_notes():
                 n = len(obj.notes["expert"])
-                lines.append(f"{dict(TRACKS)[k]}: {n} notas en Experto ({n / L:.1f}/s)")
+                lines.append(tr(f"{dict(TRACKS)[k]}: {n} notas en Experto ({n / L:.1f}/s)"))
         if self.chart.drums.has_notes():
-            lines.append(f"Batería: {len(self.chart.drums.notes['expert'])} golpes en Experto")
+            lines.append(tr(f"Batería: {len(self.chart.drums.notes['expert'])} golpes en Experto"))
         if self.chart.vocals.has_notes():
-            lines.append(f"Voz: {len(self.chart.vocals.notes)} notas")
+            lines.append(tr(f"Voz: {len(self.chart.vocals.notes)} notas"))
         self.stats.setText("\n\n".join(lines))
 
     def _fmt(self, s: float) -> str:
@@ -731,9 +732,9 @@ class VisualizerWindow(QWidget):
                                                              encoding="utf-8")
             self.dirty = False
             self.save_btn.setEnabled(False)
-            QMessageBox.information(self, "Guardado", "Los cambios se han guardado en notes.mid")
+            QMessageBox.information(self, tr("Guardado"), tr("Los cambios se han guardado en notes.mid"))
         except Exception as e:  # noqa: BLE001
-            QMessageBox.critical(self, "Error", f"No se pudo guardar: {e}")
+            QMessageBox.critical(self, "Error", tr(f"No se pudo guardar: {e}"))
 
     # ------------------------------------------------------------ reproduccion
     def _change_view(self):
@@ -747,7 +748,7 @@ class VisualizerWindow(QWidget):
 
     def _toggle(self):
         self.player.toggle()
-        self.play_btn.setText("⏸  Pausa" if self.player.playing else "▶  Reproducir")
+        self.play_btn.setText(tr("⏸  Pausa") if self.player.playing else tr("▶  Reproducir"))
 
     def _seek(self, t):
         self.player.seek(t)
@@ -768,12 +769,12 @@ class VisualizerWindow(QWidget):
             self.slider.setValue(int(t / dur * 1000))
         self.time_lbl.setText(f"{self._fmt(t)} / {self._fmt(dur)}")
         if not self.player.playing:
-            self.play_btn.setText("▶  Reproducir")
+            self.play_btn.setText(tr("▶  Reproducir"))
         self.highway.update()
 
     def closeEvent(self, ev):  # noqa: N802
         if self.dirty:
-            r = QMessageBox.question(self, "Cambios sin guardar", "¿Guardar los cambios antes de cerrar?",
+            r = QMessageBox.question(self, tr("Cambios sin guardar"), tr("¿Guardar los cambios antes de cerrar?"),
                                      QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
             if r == QMessageBox.Cancel:
                 ev.ignore()

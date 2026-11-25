@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..chart.model import DIFFICULTIES, RES, FretTrack, Phrase, TempoMap
+from ..i18n import t as tr
 from .common import stat
 
 
@@ -114,7 +115,7 @@ def find_sections(mix_mono: np.ndarray, sr: int, tm: TempoMap, time_offset: floa
     seen = {}
     for (a, b), name in zip(segs, names):
         seen[name] = seen.get(name, 0) + 1
-        label = f"{name} {seen[name]}" if totals[name] > 1 else name
+        label = f"{tr(name)} {seen[name]}" if totals[name] > 1 else tr(name)
         out.append((measures[a], label))
     log(f"  secciones: {', '.join(n for _, n in out)}")
     return out

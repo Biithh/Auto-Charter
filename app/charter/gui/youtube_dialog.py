@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
 )
+from ..i18n import t as tr
 
 
 class _Cancelled(Exception):
@@ -66,7 +67,7 @@ class YoutubeDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Añadir de YouTube")
+        self.setWindowTitle(tr("Añadir de YouTube"))
         self.resize(780, 520)
         self.pending: list[_Item] = []
         self.current: _Item | None = None
@@ -74,14 +75,14 @@ class YoutubeDialog(QDialog):
         self.dl: _Downloader | None = None
         lay = QVBoxLayout(self)
         self.urls = QPlainTextEdit()
-        self.urls.setPlaceholderText("Pega aquí uno o varios enlaces de YouTube, uno por línea...")
+        self.urls.setPlaceholderText(tr("Pega aquí uno o varios enlaces de YouTube, uno por línea..."))
         self.urls.setFixedHeight(90)
         lay.addWidget(self.urls)
         row = QHBoxLayout()
-        self.with_video = QRadioButton("Música y vídeo (de fondo en el juego)")
+        self.with_video = QRadioButton(tr("Música y vídeo (de fondo en el juego)"))
         self.with_video.setChecked(True)
-        self.only_audio = QRadioButton("Solo la música")
-        self.add_btn = QPushButton("Añadir a las descargas")
+        self.only_audio = QRadioButton(tr("Solo la música"))
+        self.add_btn = QPushButton(tr("Añadir a las descargas"))
         self.add_btn.setObjectName("primary")
         self.add_btn.clicked.connect(self._add_links)
         row.addWidget(self.with_video)
@@ -90,7 +91,7 @@ class YoutubeDialog(QDialog):
         row.addWidget(self.add_btn)
         lay.addLayout(row)
         self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["Enlace", "Descargar", "Estado"])
+        self.table.setHorizontalHeaderLabels([tr("Enlace"), tr("Descargar"), tr("Estado")])
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -100,8 +101,8 @@ class YoutubeDialog(QDialog):
             hh.setSectionResizeMode(c, QHeaderView.Fixed)
             self.table.setColumnWidth(c, w)
         lay.addWidget(self.table, 1)
-        self.status = QLabel("Se descargan de una en una y cada canción pasa a la lista al terminar. Puedes añadir "
-                             "más enlaces mientras tanto, y luego cambiar o quitar el vídeo con «Video de fondo...».")
+        self.status = QLabel(tr("Se descargan de una en una y cada canción pasa a la lista al terminar. Puedes añadir "
+                             "más enlaces mientras tanto, y luego cambiar o quitar el vídeo con «Video de fondo...»."))
         self.status.setObjectName("subtitle")
         self.status.setWordWrap(True)
         lay.addWidget(self.status)
@@ -109,7 +110,7 @@ class YoutubeDialog(QDialog):
         self.bar.setVisible(False)
         lay.addWidget(self.bar)
         btns = QHBoxLayout()
-        self.close_btn = QPushButton("Cerrar")
+        self.close_btn = QPushButton(tr("Cerrar"))
         self.close_btn.clicked.connect(self.reject)
         btns.addStretch()
         btns.addWidget(self.close_btn)
@@ -124,8 +125,8 @@ class YoutubeDialog(QDialog):
             r = self.table.rowCount()
             self.table.insertRow(r)
             self.table.setItem(r, 0, QTableWidgetItem(url))
-            self.table.setItem(r, 1, QTableWidgetItem("Música y vídeo" if video else "Solo la música"))
-            self._set_state(r, "En espera")
+            self.table.setItem(r, 1, QTableWidgetItem(tr("Música y vídeo") if video else tr("Solo la música")))
+            self._set_state(r, tr("En espera"))
             self.pending.append(_Item(url, video, r))
         self.total += len(links)
         self.urls.clear()
@@ -142,17 +143,17 @@ class YoutubeDialog(QDialog):
         if not self.pending:
             self.current = None
             self.bar.setVisible(False)
-            self.close_btn.setText("Cerrar")
-            self.status.setText(f"Descargas terminadas: {self._count('Añadida')} añadidas a la lista"
-                                + (f", {self._count('Error')} con error (pon el ratón encima para ver el motivo)."
+            self.close_btn.setText(tr("Cerrar"))
+            self.status.setText(tr(f"Descargas terminadas: {self._count(tr('Añadida'))} añadidas a la lista")
+                                + (tr(f", {self._count('Error')} con error (pon el ratón encima para ver el motivo).")
                                    if self._count("Error") else "."))
             return
         self.current = self.pending.pop(0)
-        self.close_btn.setText("Cancelar descargas")
+        self.close_btn.setText(tr("Cancelar descargas"))
         self.bar.setVisible(True)
         self.bar.setValue(0)
         self.table.scrollToItem(self.table.item(self.current.row, 0))
-        self.status.setText(f"Descargando {self.total - len(self.pending)} de {self.total}...")
+        self.status.setText(tr(f"Descargando {self.total - len(self.pending)} de {self.total}..."))
         self.dl = _Downloader(self.current.url, self.current.with_video)
         self.dl.status.connect(self._on_status)
         self.dl.progress.connect(self._on_progress)
@@ -173,7 +174,7 @@ class YoutubeDialog(QDialog):
 
     def _on_done(self, song):
         item = self._finish_thread()
-        self._set_state(item.row, "Añadida", f"{song.artist} - {song.title}" if song.artist else song.title)
+        self._set_state(item.row, tr("Añadida"), f"{song.artist} - {song.title}" if song.artist else song.title)
         self.song_ready.emit(song, item.url)
         self._after_download()
 
@@ -181,7 +182,7 @@ class YoutubeDialog(QDialog):
         stopped = self.dl.stop
         item = self._finish_thread()
         if stopped:
-            self._set_state(item.row, "Cancelada")
+            self._set_state(item.row, tr("Cancelada"))
         else:
             short = re.sub(r"^ERROR:\s*(\[[^\]]*\]\s*)?", "", msg)
             self._set_state(item.row, f"Error: {short}", msg)
@@ -206,9 +207,9 @@ class YoutubeDialog(QDialog):
             self._closing = True
             self.dl.stop = True
             for it in self.pending:
-                self._set_state(it.row, "Cancelada")
+                self._set_state(it.row, tr("Cancelada"))
             self.pending.clear()
-            self.status.setText("Cancelando...")
+            self.status.setText(tr("Cancelando..."))
             self.close_btn.setEnabled(False)
             self.add_btn.setEnabled(False)
             return

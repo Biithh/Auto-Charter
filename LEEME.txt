@@ -15,7 +15,7 @@ INSTALAR (solo la primera vez)
      - TODO se guarda dentro de esta carpeta. Para desinstalar, borra la carpeta y listo.
 
 USAR
-  1. Doble clic en "Charter.bat".
+  1. Doble clic en "Charter.bat". El idioma (espanol / ingles) se elige arriba a la derecha.
   2. Arrastra tus canciones (mp3, flac, wav, m4a...) a la ventana, o pulsa "Anadir de YouTube...",
      pega uno o varios enlaces (uno por linea), elige "Musica y video" (el video queda de fondo) o
      "Solo la musica" y pulsa "Anadir a las descargas". Se bajan de una en una y cada una pasa a la

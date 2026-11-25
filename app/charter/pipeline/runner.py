@@ -20,6 +20,7 @@ from .. import paths
 from ..audio import SR, decode_to_wav, export_ogg, load, save
 from ..chart.midi_io import write_midi
 from ..chart.model import DIFFICULTIES, RES, Chart
+from ..i18n import t as tr
 from ..songini import write_ini
 
 # Segundos de proceso por cada segundo de audio (se recalibran solos con el uso)
@@ -790,7 +791,7 @@ def _write_song_ini(out_dir, chart: Chart, meta, report, length_s, cfg: JobConfi
 
     preview = 30000
     for tick, name in chart.sections:
-        if name.startswith("Estribillo"):
+        if name.startswith(("Estribillo", "Chorus")):
             preview = int(chart.tempo.tick_to_sec(tick) * 1000)
             break
     vals = {
@@ -819,7 +820,7 @@ def _write_song_ini(out_dir, chart: Chart, meta, report, length_s, cfg: JobConfi
         "diff_vocals_harm": -1,
         "diff_guitar_real": -1,
         "diff_bass_real": -1,
-        "loading_phrase": "Chart generado automaticamente con Charter",
+        "loading_phrase": tr("Chart generado automaticamente con Charter"),
         "icon": "",
     }
     if has_video:

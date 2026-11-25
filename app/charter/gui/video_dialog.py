@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from .. import paths
 from .player import MultiTrackPlayer
+from ..i18n import t as tr
 
 
 class _Downloader(QThread):
@@ -47,7 +48,7 @@ class _Downloader(QThread):
 class VideoDialog(QDialog):
     def __init__(self, audio_path: str, video_path: str = "", video_url: str = "", offset_ms: int = 0, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Video de fondo")
+        self.setWindowTitle(tr("Video de fondo"))
         self.resize(900, 640)
         self.audio_path = audio_path
         self.video_path = video_path
@@ -57,16 +58,16 @@ class VideoDialog(QDialog):
         lay = QVBoxLayout(self)
         src = QHBoxLayout()
         self.url_edit = QLineEdit(video_url)
-        self.url_edit.setPlaceholderText("Pega aqui un enlace de YouTube...")
-        dl = QPushButton("Descargar y ver")
+        self.url_edit.setPlaceholderText(tr("Pega aqui un enlace de YouTube..."))
+        dl = QPushButton(tr("Descargar y ver"))
         dl.clicked.connect(self._download)
-        pick = QPushButton("Elegir archivo de video...")
+        pick = QPushButton(tr("Elegir archivo de video..."))
         pick.clicked.connect(self._pick)
         src.addWidget(self.url_edit, 1)
         src.addWidget(dl)
         src.addWidget(pick)
         lay.addLayout(src)
-        self.status = QLabel("Elige un video o pega un enlace de YouTube (se descarga sin audio, como maximo 1080p).")
+        self.status = QLabel(tr("Elige un video o pega un enlace de YouTube (se descarga sin audio, como maximo 1080p)."))
         self.status.setObjectName("subtitle")
         lay.addWidget(self.status)
         self.bar = QProgressBar()
@@ -78,7 +79,7 @@ class VideoDialog(QDialog):
         self.media = QMediaPlayer(self)
         self.media.setVideoOutput(self.video)
         ctr = QHBoxLayout()
-        self.play_btn = QPushButton("▶  Reproducir juntos")
+        self.play_btn = QPushButton(tr("▶  Reproducir juntos"))
         self.play_btn.clicked.connect(self._toggle)
         self.slider = QSlider(Qt.Horizontal)
         self.slider.setRange(0, 1000)
@@ -87,7 +88,7 @@ class VideoDialog(QDialog):
         ctr.addWidget(self.slider, 1)
         lay.addLayout(ctr)
         off = QHBoxLayout()
-        off.addWidget(QLabel("Desfase del video (ms):"))
+        off.addWidget(QLabel(tr("Desfase del video (ms):")))
         self.offset = QSpinBox()
         self.offset.setRange(-600000, 600000)
         self.offset.setSingleStep(50)
@@ -100,15 +101,15 @@ class VideoDialog(QDialog):
             off.addWidget(b)
         off.addStretch()
         lay.addLayout(off)
-        help_ = QLabel("Positivo = el video va por delante (se salta el principio del video). "
-                       "Negativo = el video empieza mas tarde. Ajusta hasta que lo que ves coincida con lo que oyes.")
+        help_ = QLabel(tr("Positivo = el video va por delante (se salta el principio del video). "
+                       "Negativo = el video empieza mas tarde. Ajusta hasta que lo que ves coincida con lo que oyes."))
         help_.setWordWrap(True)
         help_.setObjectName("subtitle")
         lay.addWidget(help_)
         btns = QHBoxLayout()
-        none = QPushButton("Sin video")
+        none = QPushButton(tr("Sin video"))
         none.clicked.connect(self._no_video)
-        ok = QPushButton("Aceptar")
+        ok = QPushButton(tr("Aceptar"))
         ok.setObjectName("primary")
         ok.clicked.connect(self.accept)
         btns.addStretch()
@@ -122,7 +123,7 @@ class VideoDialog(QDialog):
             self._set_video(video_path)
 
     def _pick(self):
-        f, _ = QFileDialog.getOpenFileName(self, "Elegir video", "", "Video (*.mp4 *.webm *.mkv *.avi *.mov)")
+        f, _ = QFileDialog.getOpenFileName(self, tr("Elegir video"), "", "Video (*.mp4 *.webm *.mkv *.avi *.mov)")
         if f:
             self.video_url = ""
             self._set_video(f)
@@ -131,14 +132,14 @@ class VideoDialog(QDialog):
         url = self.url_edit.text().strip()
         if not url:
             return
-        self.status.setText("Descargando video...")
+        self.status.setText(tr("Descargando video..."))
         self.bar.setVisible(True)
         self.bar.setValue(0)
         out = paths.WORK / "videos" / str(abs(hash(url)))
         self.dl = _Downloader(url, out)
         self.dl.progress.connect(lambda f: self.bar.setValue(int(f * 100)))
         self.dl.done.connect(lambda p: (self.bar.setVisible(False), setattr(self, "video_url", url), self._set_video(p)))
-        self.dl.failed.connect(lambda e: (self.bar.setVisible(False), QMessageBox.warning(self, "Video", f"No se pudo descargar: {e}")))
+        self.dl.failed.connect(lambda e: (self.bar.setVisible(False), QMessageBox.warning(self, "Video", tr(f"No se pudo descargar: {e}"))))
         self.dl.start()
 
     def _set_video(self, path: str):
@@ -156,12 +157,12 @@ class VideoDialog(QDialog):
         if self.player.playing:
             self.player.pause()
             self.media.pause()
-            self.play_btn.setText("▶  Reproducir juntos")
+            self.play_btn.setText(tr("▶  Reproducir juntos"))
         else:
             self.player.play()
             self._resync(force=True)
             self.media.play()
-            self.play_btn.setText("⏸  Pausa")
+            self.play_btn.setText(tr("⏸  Pausa"))
 
     def _seek(self, v):
         if not self._audio_loaded:

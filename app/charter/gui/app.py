@@ -13,6 +13,7 @@ from PySide6.QtCore import QSize, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QColor, QIcon, QImage, QPixmap, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QComboBox,
     QApplication,
     QFileDialog,
     QFormLayout,
@@ -34,14 +35,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import __version__, paths
+from .. import __version__, i18n, paths
 from ..pipeline.runner import JobConfig
 from .jobs import AUDIO_EXT, JobQueue
 from .theme import ACCENT, BAD, GOOD, MUTED, STYLE, WARN
+from ..i18n import t as tr
 
 SETTINGS = paths.CONFIG_DIR / "ajustes.json"
-STATUS_ES = {"pendiente": "En cola", "procesando": "Procesando", "pausada": "En pausa", "terminada": "Terminada",
-             "error": "Error", "cancelada": "Cancelada"}
+STATUS_ES = {"pendiente": tr("En cola"), "procesando": tr("Procesando"), "pausada": tr("En pausa"), "terminada": tr("Terminada"),
+             "error": "Error", "cancelada": tr("Cancelada")}
 STATUS_COLOR = {"terminada": GOOD, "error": BAD, "pausada": WARN, "procesando": ACCENT}
 
 
@@ -75,7 +77,7 @@ class DropLabel(QLabel):
     files_dropped = Signal(list)
 
     def __init__(self):
-        super().__init__("Arrastra aquí tus canciones (mp3, flac, wav, m4a...)\no pulsa «Añadir canciones» o «Añadir de YouTube»")
+        super().__init__(tr("Arrastra aquí tus canciones (mp3, flac, wav, m4a...)\no pulsa «Añadir canciones» o «Añadir de YouTube»"))
         self.setObjectName("drop")
         self.setAlignment(Qt.AlignCenter)
         self.setAcceptDrops(True)
@@ -120,7 +122,7 @@ class _CalibrationThread(QThread):
         n = res["aggregate"].get("n_songs", 0)
         if n >= 20:
             # con suficientes canciones, se reentrenan tambien los modelos de reduccion de dificultad
-            self.log.emit("Entrenando el modelo de dificultades con tus charts (puede tardar)...")
+            self.log.emit(tr("Entrenando el modelo de dificultades con tus charts (puede tardar)..."))
             try:
                 reducer_model.save(reducer_model.train(self.folder, log=lambda *_: None),
                                    paths.CONFIG_DIR / "reducer.pkl")
@@ -128,16 +130,16 @@ class _CalibrationThread(QThread):
                                         paths.CONFIG_DIR / "drum_reducer.pkl")
                 reducer_model._CACHE = None
                 drum_reducer_model._CACHE = None
-                self.log.emit("Modelo de dificultades entrenado con tu biblioteca.")
+                self.log.emit(tr("Modelo de dificultades entrenado con tu biblioteca."))
             except Exception as e:  # noqa: BLE001
-                self.log.emit(f"No se pudo entrenar el modelo de dificultades: {e}")
+                self.log.emit(tr(f"No se pudo entrenar el modelo de dificultades: {e}"))
         self.done.emit(n)
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"Charter {__version__} — charts para YARG y Clone Hero")
+        self.setWindowTitle(tr(f"Charter {__version__} — charts para YARG y Clone Hero"))
         self.resize(1280, 860)
         self.settings = load_settings()
         self.queue = JobQueue(self)
@@ -152,15 +154,22 @@ class MainWindow(QMainWindow):
         self.timer.start(1000)
         QTimer.singleShot(0, self._show_rules)
 
+    def _change_lang(self):
+        self.settings["idioma"] = self.lang_cb.currentData()
+        save_settings(self.settings)
+        # texto en los dos idiomas: todavía no se ha reiniciado
+        QMessageBox.information(self, "Charter", "Reinicia Charter para cambiar el idioma.\n"
+                                                 "Restart Charter to change the language.")
+
     def _show_rules(self):
         if self.settings.get("normas_aceptadas"):
             return
         r = QMessageBox.information(
-            self, "Normas de uso",
-            "Los charts que genera Charter son solo para tu uso personal.\n\n"
+            self, tr("Normas de uso"),
+            tr("Los charts que genera Charter son solo para tu uso personal.\n\n"
             "No puedes publicarlos, subirlos ni repartirlos de ninguna forma, ni gratis: "
             "ni webs de charts, ni Discord, ni Reddit, ni foros, ni enlaces, ni packs.\n\n"
-            "Usa solo canciones que tengas derecho a usar. Condiciones completas en LICENSE.",
+            "Usa solo canciones que tengas derecho a usar. Condiciones completas en LICENSE."),
             QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Ok)
         if r != QMessageBox.Ok:
             self.close()
@@ -178,14 +187,21 @@ class MainWindow(QMainWindow):
         head = QHBoxLayout()
         title = QLabel("Charter")
         title.setObjectName("title")
-        sub = QLabel("Convierte tus canciones en charts jugables para YARG / Clone Hero: guitarra, rítmica, bajo, "
-                     "batería, teclado, Pro Keys y voz, en Fácil, Medio, Difícil y Experto.")
+        sub = QLabel(tr("Convierte tus canciones en charts jugables para YARG / Clone Hero: guitarra, rítmica, bajo, "
+                     "batería, teclado, Pro Keys y voz, en Fácil, Medio, Difícil y Experto."))
         sub.setObjectName("subtitle")
         sub.setWordWrap(True)
         tbox = QVBoxLayout()
         tbox.addWidget(title)
         tbox.addWidget(sub)
         head.addLayout(tbox, 1)
+        self.lang_cb = QComboBox()
+        for code, name in i18n.LANGS.items():
+            self.lang_cb.addItem(name, code)
+        self.lang_cb.setCurrentIndex(list(i18n.LANGS).index(i18n.LANG))
+        self.lang_cb.setToolTip("Idioma / Language")
+        self.lang_cb.currentIndexChanged.connect(self._change_lang)
+        head.addWidget(self.lang_cb, 0, Qt.AlignTop)
         lay.addLayout(head)
 
         split = QSplitter(Qt.Vertical)
@@ -198,7 +214,7 @@ class MainWindow(QMainWindow):
         self.drop.files_dropped.connect(self._add_files)
         left.addWidget(self.drop)
         self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["", "Canción", "Estado", "Progreso", "Tiempo restante"])
+        self.table.setHorizontalHeaderLabels(["", tr("Canción"), tr("Estado"), tr("Progreso"), tr("Tiempo restante")])
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -216,12 +232,12 @@ class MainWindow(QMainWindow):
         self.table.doubleClicked.connect(lambda _: self._open_visualizer())
         left.addWidget(self.table, 1)
         row = QHBoxLayout()
-        add = QPushButton("Añadir canciones...")
+        add = QPushButton(tr("Añadir canciones..."))
         add.clicked.connect(self._pick_files)
-        yt = QPushButton("Añadir de YouTube...")
-        yt.setToolTip("Descarga la música de un enlace de YouTube y, si quieres, también su vídeo para el fondo.")
+        yt = QPushButton(tr("Añadir de YouTube..."))
+        yt.setToolTip(tr("Descarga la música de un enlace de YouTube y, si quieres, también su vídeo para el fondo."))
         yt.clicked.connect(self._add_youtube)
-        self.remove_btn = QPushButton("Quitar")
+        self.remove_btn = QPushButton(tr("Quitar"))
         self.remove_btn.clicked.connect(self._remove)
         row.addWidget(add)
         row.addWidget(yt)
@@ -231,19 +247,19 @@ class MainWindow(QMainWindow):
         tl.addLayout(left, 3)
         # --- derecha: detalles + salida + controles
         right = QVBoxLayout()
-        det = QGroupBox("Canción seleccionada")
+        det = QGroupBox(tr("Canción seleccionada"))
         dl = QVBoxLayout(det)
         crow = QHBoxLayout()
-        self.cover_lbl = QLabel("Sin\nportada")
+        self.cover_lbl = QLabel(tr("Sin\nportada"))
         self.cover_lbl.setFixedSize(120, 120)
         self.cover_lbl.setAlignment(Qt.AlignCenter)
         self.cover_lbl.setStyleSheet("border: 1px solid #3a3a48; border-radius: 8px; color: #777;")
         cbtns = QVBoxLayout()
-        self.cover_btn = QPushButton("Cambiar portada...")
+        self.cover_btn = QPushButton(tr("Cambiar portada..."))
         self.cover_btn.clicked.connect(self._pick_cover)
-        self.video_btn = QPushButton("Video de fondo...")
+        self.video_btn = QPushButton(tr("Video de fondo..."))
         self.video_btn.clicked.connect(self._video)
-        self.video_lbl = QLabel("Sin video")
+        self.video_lbl = QLabel(tr("Sin video"))
         self.video_lbl.setObjectName("subtitle")
         self.video_lbl.setWordWrap(True)
         cbtns.addWidget(self.cover_btn)
@@ -259,39 +275,39 @@ class MainWindow(QMainWindow):
         self.f_album = QLineEdit()
         self.f_year = QLineEdit()
         self.f_genre = QLineEdit()
-        for lbl, w, key in (("Título", self.f_title, "title"), ("Artista", self.f_artist, "artist"),
-                            ("Álbum", self.f_album, "album"), ("Año", self.f_year, "year"),
-                            ("Género", self.f_genre, "genre")):
-            w.setPlaceholderText("automático")
+        for lbl, w, key in ((tr("Título"), self.f_title, "title"), (tr("Artista"), self.f_artist, "artist"),
+                            (tr("Álbum"), self.f_album, "album"), (tr("Año"), self.f_year, "year"),
+                            (tr("Género"), self.f_genre, "genre")):
+            w.setPlaceholderText(tr("automático"))
             w.editingFinished.connect(lambda w=w, key=key: self._edit_field(key, w.text()))
             form.addRow(lbl + ":", w)
         dl.addLayout(form)
         brow = QHBoxLayout()
-        self.vis_btn = QPushButton("Abrir visualizador")
+        self.vis_btn = QPushButton(tr("Abrir visualizador"))
         self.vis_btn.clicked.connect(self._open_visualizer)
-        self.folder_btn = QPushButton("Abrir carpeta")
+        self.folder_btn = QPushButton(tr("Abrir carpeta"))
         self.folder_btn.clicked.connect(self._open_folder)
         brow.addWidget(self.vis_btn)
         brow.addWidget(self.folder_btn)
-        self.regen_btn = QPushButton("Regenerar")
-        self.regen_btn.setToolTip("Vuelve a crear el chart con lo último aprendido. Reutiliza la separación y la "
-                                  "transcripción ya hechas, así que tarda poco.")
+        self.regen_btn = QPushButton(tr("Regenerar"))
+        self.regen_btn.setToolTip(tr("Vuelve a crear el chart con lo último aprendido. Reutiliza la separación y la "
+                                  "transcripción ya hechas, así que tarda poco."))
         self.regen_btn.clicked.connect(self._regenerate)
         brow.addWidget(self.regen_btn)
         dl.addLayout(brow)
         right.addWidget(det)
-        out = QGroupBox("Carpeta de salida")
+        out = QGroupBox(tr("Carpeta de salida"))
         ol = QHBoxLayout(out)
         self.out_edit = QLineEdit(self.settings.get("output_dir", str(paths.ROOT / "Canciones generadas")))
         self.out_edit.editingFinished.connect(self._save_out)
-        ob = QPushButton("Elegir...")
+        ob = QPushButton(tr("Elegir..."))
         ob.clicked.connect(self._pick_out)
         ol.addWidget(self.out_edit, 1)
         ol.addWidget(ob)
         right.addWidget(out)
-        ctl = QGroupBox("Proceso")
+        ctl = QGroupBox(tr("Proceso"))
         cl = QVBoxLayout(ctl)
-        self.step_lbl = QLabel("Listo para empezar")
+        self.step_lbl = QLabel(tr("Listo para empezar"))
         self.total_bar = QProgressBar()
         self.total_bar.setRange(0, 1000)
         self.eta_lbl = QLabel("")
@@ -300,24 +316,24 @@ class MainWindow(QMainWindow):
         cl.addWidget(self.total_bar)
         cl.addWidget(self.eta_lbl)
         bl = QHBoxLayout()
-        self.start_btn = QPushButton("Generar charts")
+        self.start_btn = QPushButton(tr("Generar charts"))
         self.start_btn.setObjectName("primary")
         self.start_btn.clicked.connect(self._start)
-        self.pause_btn = QPushButton("Pausar")
+        self.pause_btn = QPushButton(tr("Pausar"))
         self.pause_btn.clicked.connect(self._pause)
-        self.cancel_btn = QPushButton("Cancelar canción")
+        self.cancel_btn = QPushButton(tr("Cancelar canción"))
         self.cancel_btn.clicked.connect(self._cancel)
         bl.addWidget(self.start_btn, 1)
         bl.addWidget(self.pause_btn)
         bl.addWidget(self.cancel_btn)
         cl.addLayout(bl)
         right.addWidget(ctl)
-        cal = QPushButton("Entrenar con mi biblioteca de canciones...")
-        cal.setToolTip("Aprende de tus charts (por ejemplo tu carpeta de Clone Hero / YARG) cómo tienen que ser "
-                       "las canciones. Puedes dejarlo varias horas; solo lee tus archivos.")
+        cal = QPushButton(tr("Entrenar con mi biblioteca de canciones..."))
+        cal.setToolTip(tr("Aprende de tus charts (por ejemplo tu carpeta de Clone Hero / YARG) cómo tienen que ser "
+                       "las canciones. Puedes dejarlo varias horas; solo lee tus archivos."))
         cal.clicked.connect(self._calibrate)
         right.addWidget(cal)
-        openv = QPushButton("Abrir en el visualizador un chart ya generado...")
+        openv = QPushButton(tr("Abrir en el visualizador un chart ya generado..."))
         openv.clicked.connect(self._open_existing)
         right.addWidget(openv)
         right.addStretch()
@@ -331,9 +347,9 @@ class MainWindow(QMainWindow):
         cv = QVBoxLayout(cons)
         cv.setContentsMargins(0, 6, 0, 0)
         ch = QHBoxLayout()
-        cl_ = QLabel("Consola (lo que está haciendo el programa en cada momento)")
+        cl_ = QLabel(tr("Consola (lo que está haciendo el programa en cada momento)"))
         cl_.setObjectName("subtitle")
-        clr = QPushButton("Limpiar")
+        clr = QPushButton(tr("Limpiar"))
         clr.clicked.connect(lambda: self.console.clear())
         ch.addWidget(cl_)
         ch.addStretch()
@@ -347,7 +363,7 @@ class MainWindow(QMainWindow):
         split.addWidget(cons)
         split.setSizes([560, 280])
         lay.addWidget(split, 1)
-        self._log("info", f"Charter {__version__} listo. Carpeta del programa: {paths.ROOT}")
+        self._log("info", tr(f"Charter {__version__} listo. Carpeta del programa: {paths.ROOT}"))
         self._check_gpu()
 
     def _check_gpu(self):
@@ -357,15 +373,15 @@ class MainWindow(QMainWindow):
             if torch.cuda.is_available():
                 name = torch.cuda.get_device_name(0)
                 vram = torch.cuda.get_device_properties(0).total_memory / 2 ** 30
-                self._log("good", f"Tarjeta grafica: {name} ({vram:.0f} GB). Se usara para la IA.")
+                self._log("good", tr(f"Tarjeta grafica: {name} ({vram:.0f} GB). Se usara para la IA."))
             else:
-                self._log("warn", "No se ha encontrado una tarjeta NVIDIA: todo ira por CPU (mucho mas lento).")
+                self._log("warn", tr("No se ha encontrado una tarjeta NVIDIA: todo ira por CPU (mucho mas lento)."))
         except Exception as e:  # noqa: BLE001
-            self._log("warn", f"No se pudo comprobar la GPU: {e}")
+            self._log("warn", tr(f"No se pudo comprobar la GPU: {e}"))
 
     # ------------------------------------------------------------ cola
     def _pick_files(self):
-        files, _ = QFileDialog.getOpenFileNames(self, "Añadir canciones", self.settings.get("last_dir", ""),
+        files, _ = QFileDialog.getOpenFileNames(self, tr("Añadir canciones"), self.settings.get("last_dir", ""),
                                                 "Audio (*.mp3 *.flac *.wav *.m4a *.ogg *.opus *.aac)")
         if files:
             self.settings["last_dir"] = str(Path(files[0]).parent)
@@ -388,7 +404,7 @@ class MainWindow(QMainWindow):
                 job.meta = None  # type: ignore[attr-defined]
             self.table.insertRow(idx)
             self._fill_row(idx)
-            self._log("info", f"Añadida: {Path(f).name}")
+            self._log("info", tr(f"Añadida: {Path(f).name}"))
         if self.table.currentRow() < 0 and self.table.rowCount():
             self.table.selectRow(0)
         self._update_buttons()
@@ -460,8 +476,8 @@ class MainWindow(QMainWindow):
         if r < 0:
             return
         if r == self.queue.current:
-            QMessageBox.information(self, "Quitar", "No se puede quitar la canción que se está procesando. "
-                                                     "Cancélala primero.")
+            QMessageBox.information(self, tr("Quitar"), tr("No se puede quitar la canción que se está procesando. "
+                                                     "Cancélala primero."))
             return
         self.queue.remove(r)
         self.table.removeRow(r)
@@ -493,11 +509,11 @@ class MainWindow(QMainWindow):
         if pm is not None and not pm.isNull():
             self.cover_lbl.setPixmap(pm.scaled(120, 120, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
-            self.cover_lbl.setText("Sin portada\n(se buscará\nen internet)")
+            self.cover_lbl.setText(tr("Sin portada\n(se buscará\nen internet)"))
         if job.config.video_path:
-            self.video_lbl.setText(f"Video: {Path(job.config.video_path).name}\nDesfase: {job.config.video_offset_ms} ms")
+            self.video_lbl.setText(tr(f"Video: {Path(job.config.video_path).name}\nDesfase: {job.config.video_offset_ms} ms"))
         else:
-            self.video_lbl.setText("Sin video")
+            self.video_lbl.setText(tr("Sin video"))
         done = job.status == "terminada" and job.output
         self.vis_btn.setEnabled(bool(done))
         self.folder_btn.setEnabled(bool(done))
@@ -513,7 +529,7 @@ class MainWindow(QMainWindow):
         job = self._selected_job()
         if not job:
             return
-        f, _ = QFileDialog.getOpenFileName(self, "Elegir portada", "", "Imagen (*.png *.jpg *.jpeg *.webp *.bmp)")
+        f, _ = QFileDialog.getOpenFileName(self, tr("Elegir portada"), "", tr("Imagen (*.png *.jpg *.jpeg *.webp *.bmp)"))
         if f:
             job.config.cover_path = f
             self._fill_row(self.table.currentRow())
@@ -531,7 +547,7 @@ class MainWindow(QMainWindow):
             self._select()
 
     def _pick_out(self):
-        d = QFileDialog.getExistingDirectory(self, "Carpeta de salida", self.out_edit.text())
+        d = QFileDialog.getExistingDirectory(self, tr("Carpeta de salida"), self.out_edit.text())
         if d:
             self.out_edit.setText(d)
             self._save_out()
@@ -546,7 +562,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------ control
     def _start(self):
         if not self.queue.jobs:
-            QMessageBox.information(self, "Charter", "Añade primero alguna canción.")
+            QMessageBox.information(self, "Charter", tr("Añade primero alguna canción."))
             return
         Path(self.out_edit.text()).mkdir(parents=True, exist_ok=True)
         for j in self.queue.jobs:
@@ -566,13 +582,13 @@ class MainWindow(QMainWindow):
             self.queue.resume()
         else:
             self.queue.pause()
-            self.step_lbl.setText("En pausa — la tarjeta gráfica está libre. Pulsa «Reanudar» para seguir.")
+            self.step_lbl.setText(tr("En pausa — la tarjeta gráfica está libre. Pulsa «Reanudar» para seguir."))
         self._update_buttons()
 
     def _cancel(self):
         if self.queue.current is None:
             return
-        r = QMessageBox.question(self, "Cancelar", "¿Cancelar la canción que se está procesando?")
+        r = QMessageBox.question(self, tr("Cancelar"), tr("¿Cancelar la canción que se está procesando?"))
         if r == QMessageBox.Yes:
             self.queue.cancel_current()
             self.queue._next()
@@ -581,7 +597,7 @@ class MainWindow(QMainWindow):
         busy = self.queue.proc is not None
         self.start_btn.setEnabled(not busy and not self.queue.paused and bool(self.queue.jobs))
         self.pause_btn.setEnabled(busy or self.queue.paused)
-        self.pause_btn.setText("Reanudar" if self.queue.paused else "Pausar")
+        self.pause_btn.setText(tr("Reanudar") if self.queue.paused else tr("Pausar"))
         self.cancel_btn.setEnabled(busy)
         self.remove_btn.setEnabled(bool(self.queue.jobs))
 
@@ -609,13 +625,13 @@ class MainWindow(QMainWindow):
                     remaining += per_sec * j.duration
                 except Exception:  # noqa: BLE001
                     remaining += per_sec * 240
-            self.eta_lbl.setText(f"Esta canción: {fmt_eta(job.eta)}   ·   Toda la cola: {fmt_eta(remaining)}")
+            self.eta_lbl.setText(tr(f"Esta canción: {fmt_eta(job.eta)}   ·   Toda la cola: {fmt_eta(remaining)}"))
             self._fill_row(cur)
 
     def _all_done(self):
         n_ok = sum(j.status == "terminada" for j in self.queue.jobs)
         n_err = sum(j.status == "error" for j in self.queue.jobs)
-        self.step_lbl.setText(f"Cola terminada: {n_ok} listas" + (f", {n_err} con error" if n_err else ""))
+        self.step_lbl.setText(tr(f"Cola terminada: {n_ok} listas") + (tr(f", {n_err} con error") if n_err else ""))
         self.total_bar.setValue(1000)
         self.eta_lbl.setText("")
         self._update_buttons()
@@ -636,16 +652,16 @@ class MainWindow(QMainWindow):
         r = self.table.currentRow()
         if r < 0:
             return
-        self._log("info", f"Regenerando {Path(self.queue.jobs[r].config.audio_path).name} con lo último aprendido...")
+        self._log("info", tr(f"Regenerando {Path(self.queue.jobs[r].config.audio_path).name} con lo último aprendido..."))
         self.queue.regenerate(r)
         self._update_buttons()
 
     def _open_existing(self):
-        d = QFileDialog.getExistingDirectory(self, "Carpeta de la canción (con notes.mid)", self.out_edit.text())
+        d = QFileDialog.getExistingDirectory(self, tr("Carpeta de la canción (con notes.mid)"), self.out_edit.text())
         if not d:
             return
         if not (Path(d) / "notes.mid").exists():
-            QMessageBox.warning(self, "Visualizador", "En esa carpeta no hay un notes.mid.")
+            QMessageBox.warning(self, tr("Visualizador"), tr("En esa carpeta no hay un notes.mid."))
             return
         from .visualizer import VisualizerWindow
 
@@ -662,12 +678,12 @@ class MainWindow(QMainWindow):
         from .train_dialog import TrainDialog
 
         if self.queue.proc is not None:
-            r = QMessageBox.question(self, "Entrenar", "Se están generando canciones. Entrenar a la vez hará que "
-                                                       "las dos cosas vayan más lentas. ¿Abrir igualmente?")
+            r = QMessageBox.question(self, tr("Entrenar"), tr("Se están generando canciones. Entrenar a la vez hará que "
+                                                       "las dos cosas vayan más lentas. ¿Abrir igualmente?"))
             if r != QMessageBox.Yes:
                 return
         dlg = TrainDialog(self.settings, self)
-        dlg.on_finished = lambda: self._log("good", "Entrenamiento terminado: las próximas canciones usarán lo aprendido.")
+        dlg.on_finished = lambda: self._log("good", tr("Entrenamiento terminado: las próximas canciones usarán lo aprendido."))
         dlg.exec()
         save_settings(self.settings)
 
@@ -684,14 +700,14 @@ class MainWindow(QMainWindow):
         cur = self.console.textCursor()
         cur.movePosition(QTextCursor.End)
         stamp = time.strftime("%H:%M:%S")
-        cur.insertText(f"[{stamp}] {msg}\n", fmt)
+        cur.insertText(f"[{stamp}] {tr(msg)}\n", fmt)
         self.console.setTextCursor(cur)
         self.console.ensureCursorVisible()
 
     def closeEvent(self, ev):  # noqa: N802
         if self.queue.proc is not None or self.queue.paused:
-            r = QMessageBox.question(self, "Salir", "Hay canciones en proceso. Si cierras se cancelará todo lo que "
-                                                    "no haya terminado. ¿Salir?")
+            r = QMessageBox.question(self, tr("Salir"), tr("Hay canciones en proceso. Si cierras se cancelará todo lo que "
+                                                    "no haya terminado. ¿Salir?"))
             if r != QMessageBox.Yes:
                 ev.ignore()
                 return
@@ -716,7 +732,7 @@ def _install_excepthook() -> None:
         except Exception:  # noqa: BLE001
             pass
         try:
-            QMessageBox.critical(None, "Error inesperado", f"{value}\n\nDetalles guardados en config/errores.log")
+            QMessageBox.critical(None, tr("Error inesperado"), tr(f"{value}\n\nDetalles guardados en config/errores.log"))
         except Exception:  # noqa: BLE001
             pass
 

@@ -3,6 +3,7 @@ setlocal
 set "ROOT=%~dp0"
 if not exist "%ROOT%runtime\venv\Scripts\pythonw.exe" (
     echo Charter no esta instalado todavia. Ejecuta primero "Instalar Charter.bat".
+    echo Charter is not installed yet. Run "Instalar Charter.bat" first.
     pause
     exit /b 1
 )

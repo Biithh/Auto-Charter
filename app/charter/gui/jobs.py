@@ -14,6 +14,7 @@ from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, Signal
 
 from .. import paths
 from ..pipeline.runner import JobConfig
+from ..i18n import t as tr
 
 AUDIO_EXT = (".mp3", ".flac", ".wav", ".m4a", ".ogg", ".opus", ".aac", ".wma")
 
@@ -99,7 +100,7 @@ class JobQueue(QObject):
             # si algo falla al lanzar, la cola no se queda bloqueada
             job = self.jobs[idx]
             job.status = "error"
-            job.error = f"No se pudo lanzar el proceso: {e}"
+            job.error = tr(f"No se pudo lanzar el proceso: {e}")
             self.proc = None
             self.current = None
             self.log.emit("error", job.error)
@@ -135,7 +136,7 @@ class JobQueue(QObject):
             python = python[:-10] + "pythonw.exe"
         self.proc.start(python, ["-m", "charter.worker", str(job_file)])
         name = Path(job.config.audio_path).name
-        self.log.emit("info", f"===== Empezando: {name} =====" if job.progress == 0 else f"===== Reanudando: {name} =====")
+        self.log.emit("info", tr(f"===== Empezando: {name} =====") if job.progress == 0 else tr(f"===== Reanudando: {name} ====="))
         self.changed.emit(idx)
 
     # ------------------------------------------------------------ pausa
@@ -145,15 +146,15 @@ class JobQueue(QObject):
         if self.proc is not None and self.current is not None:
             job = self.jobs[self.current]
             job.status = "pausada"
-            job.step_name = "En pausa"
-            self.log.emit("warn", "Pausa: cerrando el proceso para liberar la tarjeta grafica...")
+            job.step_name = tr("En pausa")
+            self.log.emit("warn", tr("Pausa: cerrando el proceso para liberar la tarjeta grafica..."))
             self._kill_proc()
             self.changed.emit(self.current)
 
     def resume(self) -> None:
         self.paused = False
         self.running = True
-        self.log.emit("info", "Reanudando (se recargan los modelos, puede tardar unos segundos)...")
+        self.log.emit("info", tr("Reanudando (se recargan los modelos, puede tardar unos segundos)..."))
         self._next()
 
     def cancel_current(self) -> None:
@@ -265,7 +266,7 @@ class JobQueue(QObject):
             self.log.emit("warn", "AVISO: " + ev["msg"])
         elif t == "progress":
             job.progress = ev.get("overall", 0)
-            job.step_name = ev.get("step_name", "")
+            job.step_name = tr(ev.get("step_name", ""))
             job.eta = ev.get("eta", 0)
             self.changed.emit(self.current)
         elif t == "done":
@@ -273,11 +274,11 @@ class JobQueue(QObject):
             job.output = ev.get("output", "")
             job.progress = 1.0
             job.eta = 0
-            job.step_name = "Terminada"
-            self.log.emit("good", f"Listo: {job.output}")
+            job.step_name = tr("Terminada")
+            self.log.emit("good", tr(f"Listo: {job.output}"))
         elif t == "error":
             job.status = "error"
-            job.error = ev.get("msg", "")
+            job.error = tr(ev.get("msg", ""))
             self.log.emit("error", "ERROR: " + job.error)
             for l in (ev.get("trace") or "").splitlines()[-12:]:
                 self.log.emit("raw", l)
@@ -292,7 +293,7 @@ class JobQueue(QObject):
             job = self.jobs[idx]
             if job.status == "procesando":
                 job.status = "error"
-                job.error = job.error or f"El proceso termino de forma inesperada (codigo {code})"
+                job.error = job.error or tr(f"El proceso termino de forma inesperada (codigo {code})")
                 self.log.emit("error", job.error)
             # al terminar se conserva lo pesado (pistas separadas, transcripcion) para poder regenerar el
             # chart en un momento; se borra al cerrar el programa o al quitar la cancion de la lista

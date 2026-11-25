@@ -13,7 +13,7 @@ It makes charts in all difficulties for:
 - Pro keys
 - Vocals (with synced lyrics)
 
-It's trained on a lot of charts and it isn't perfect, but it works for casual players, or for charters who want a solid starting point to fix up. The interface is in Spanish for now.
+It's trained on a lot of charts and it isn't perfect, but it works for casual players, or for charters who want a solid starting point to fix up. The program is in English and Spanish: choose the language in the top-right corner of the window.
 
 ## Requirements
 
@@ -64,7 +64,7 @@ Genera charts en todas las dificultades de:
 - Pro keys
 - Voz (con la letra sincronizada)
 
-Está entrenado con muchos charts y no es perfecto, pero sirve para jugadores casuales o para quien quiera crear charts y busque una base bastante buena desde la que empezar a corregir.
+Está entrenado con muchos charts y no es perfecto, pero sirve para jugadores casuales o para quien quiera crear charts y busque una base bastante buena desde la que empezar a corregir. El programa está en español y en inglés: el idioma se elige arriba a la derecha de la ventana.
 
 ## Requisitos
 

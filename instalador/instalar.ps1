@@ -30,28 +30,28 @@ function Ok($texto) { Write-Host "    $texto" -ForegroundColor Green }
 function Aviso($texto) { Write-Host "    $texto" -ForegroundColor Yellow }
 
 function Descargar($url, $destino) {
-    Write-Host "    Descargando $url"
+    Write-Host "    Descargando / Downloading $url"
     for ($i = 1; $i -le 3; $i++) {
         try {
             Invoke-WebRequest -Uri $url -OutFile $destino -UseBasicParsing
             return
         } catch {
             if ($i -eq 3) { throw }
-            Aviso "Fallo la descarga (intento $i), reintentando..."
+            Aviso "Fallo la descarga (intento $i), reintentando... / Download failed (try $i), retrying..."
             Start-Sleep -Seconds 3
         }
     }
 }
 
 Write-Host "==============================================" -ForegroundColor Magenta
-Write-Host "        Instalador de Charter (YARG / CH)      " -ForegroundColor Magenta
+Write-Host "   Instalador de Charter / Charter installer  " -ForegroundColor Magenta
 Write-Host "==============================================" -ForegroundColor Magenta
-Write-Host "Carpeta: $Root"
+Write-Host "Carpeta / Folder: $Root"
 
 New-Item -ItemType Directory -Force $Runtime, $Models, $UvDir | Out-Null
 
 # ---------------------------------------------------------------- GPU / CUDA
-Paso "Comprobando tarjeta grafica NVIDIA y driver"
+Paso "Comprobando tarjeta grafica NVIDIA y driver / Checking NVIDIA graphics card and driver"
 $gpuOk = $false
 try {
     $smi = & nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>$null
@@ -62,7 +62,9 @@ try {
         $mayor = [int]($driver.Split(".")[0])
         if ($mayor -lt 570) {
             Aviso "Tu driver de NVIDIA es antiguo ($driver). Charter necesita la version 570 o superior (CUDA 12.8)."
+            Aviso "Your NVIDIA driver is old ($driver). Charter needs version 570 or newer (CUDA 12.8)."
             Aviso "Se abrira la pagina de descarga de drivers de NVIDIA. Instala el driver y vuelve a ejecutar el instalador."
+            Aviso "The NVIDIA driver download page will open. Install the driver and run the installer again."
             Start-Process "https://www.nvidia.com/es-es/drivers/"
             Read-Host "Pulsa Enter para continuar de todos modos (funcionara solo con CPU, muy lento)"
         } else {
@@ -71,14 +73,15 @@ try {
     }
 } catch { }
 if (-not $gpuOk -and -not $smi) {
-    Aviso "No se ha encontrado una tarjeta NVIDIA con driver instalado."
+    Aviso "No se ha encontrado una tarjeta NVIDIA con driver instalado. / No NVIDIA card with a driver was found."
     Aviso "Charter funcionara con CPU, pero sera MUCHO mas lento (puede tardar muchas horas por cancion)."
-    Aviso "Si tienes una NVIDIA, instala su driver desde https://www.nvidia.com/es-es/drivers/"
+    Aviso "Charter will run on the CPU, but MUCH slower (it can take many hours per song)."
+    Aviso "Si tienes una NVIDIA, instala su driver / If you have an NVIDIA card, install its driver: https://www.nvidia.com/drivers/"
 }
-Ok "No hace falta instalar el CUDA Toolkit: PyTorch trae su propio CUDA dentro de la carpeta."
+Ok "No hace falta instalar CUDA / No need to install CUDA: PyTorch brings its own."
 
 # ---------------------------------------------------------------- uv
-Paso "Preparando gestor de paquetes (uv)"
+Paso "Preparando gestor de paquetes / Preparing package manager (uv)"
 if (-not (Test-Path $UvExe)) {
     $zip = Join-Path $Runtime "uv.zip"
     Descargar "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip" $zip
@@ -88,7 +91,7 @@ if (-not (Test-Path $UvExe)) {
 Ok (& $UvExe --version)
 
 # ---------------------------------------------------------------- Python
-Paso "Instalando Python 3.12 portable"
+Paso "Instalando / Installing Python 3.12 portable"
 if (-not (Test-Path $Py)) {
     & $UvExe python install 3.12 --no-bin
     if ($LASTEXITCODE -ne 0) { throw "No se pudo instalar Python" }
@@ -98,7 +101,7 @@ if (-not (Test-Path $Py)) {
 Ok (& $Py --version)
 
 # ---------------------------------------------------------------- ffmpeg
-Paso "Instalando ffmpeg portable"
+Paso "Instalando / Installing ffmpeg portable"
 if (-not (Test-Path (Join-Path $FfmpegDir "ffmpeg.exe"))) {
     $zip = Join-Path $Runtime "ffmpeg.zip"
     Descargar "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" $zip
@@ -109,31 +112,32 @@ if (-not (Test-Path (Join-Path $FfmpegDir "ffmpeg.exe"))) {
     Remove-Item $tmp -Recurse -Force
     Remove-Item $zip
 }
-Ok "ffmpeg listo"
+Ok "ffmpeg listo / ready"
 $env:PATH = "$FfmpegDir;$env:PATH"
 
 # ---------------------------------------------------------------- Librerias
-Paso "Instalando librerias (PyTorch con CUDA, separacion, transcripcion, interfaz...)"
-Aviso "Esto puede tardar bastante la primera vez (varios GB)."
+Paso "Instalando librerias / Installing libraries (PyTorch + CUDA, separation, transcription, interface...)"
+Aviso "Esto puede tardar bastante la primera vez (varios GB). / This can take a while the first time (several GB)."
 $backend = if ($gpuOk) { "cu128" } else { "cpu" }
 $req = Join-Path $Root "app\requirements.txt"
 & $UvExe pip install --python $Py --torch-backend=$backend -r $req
-if ($LASTEXITCODE -ne 0) { throw "Fallo la instalacion de librerias" }
-Ok "Librerias instaladas"
+if ($LASTEXITCODE -ne 0) { throw "Fallo la instalacion de librerias / Library installation failed" }
+Ok "Librerias instaladas / Libraries installed"
 
-Paso "Comprobando PyTorch y la GPU"
+Paso "Comprobando PyTorch y la GPU / Checking PyTorch and the GPU"
 & $Py -c "import torch;print('    PyTorch', torch.__version__, '| CUDA disponible:', torch.cuda.is_available(), '|', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
 
 # ---------------------------------------------------------------- Modelos
-Paso "Descargando modelos de IA (puede ocupar bastantes GB)"
+Paso "Descargando modelos de IA / Downloading AI models (several GB)"
 $env:PYTHONPATH = Join-Path $Root "app"
 & $Py -m charter.setup_models
 if ($LASTEXITCODE -ne 0) {
     Aviso "Algunos modelos no se pudieron descargar. Se reintentara automaticamente al usar el programa."
+    Aviso "Some models couldn't be downloaded. It will retry automatically when you use the program."
 }
 
 # ---------------------------------------------------------------- Modelos de Charter
-Paso "Descargando los modelos entrenados de Charter"
+Paso "Descargando los modelos de Charter / Downloading Charter's trained models"
 $Config = Join-Path $Root "config"
 if (-not (Test-Path (Join-Path $Config "notas_neuronal.pt"))) {
     New-Item -ItemType Directory -Force $Config | Out-Null
@@ -142,9 +146,10 @@ if (-not (Test-Path (Join-Path $Config "notas_neuronal.pt"))) {
     Expand-Archive -Path $zip -DestinationPath $Config -Force
     Remove-Item $zip
 }
-Ok "Modelos de Charter listos"
+Ok "Modelos de Charter listos / Charter models ready"
 
 Write-Host ""
 Write-Host "==============================================" -ForegroundColor Green
-Write-Host " Instalacion terminada. Abre 'Charter.bat'.    " -ForegroundColor Green
+Write-Host " Instalacion terminada / Installation finished " -ForegroundColor Green
+Write-Host " Abre / Open 'Charter.bat'                    " -ForegroundColor Green
 Write-Host "==============================================" -ForegroundColor Green
