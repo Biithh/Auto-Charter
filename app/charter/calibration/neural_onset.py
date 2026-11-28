@@ -32,6 +32,7 @@ FPS = 22050 / 256 / 2
 N_IN = 85  # 84 notas de CQT + envolvente de ataques
 CROP = 640  # ~15 s por ejemplo
 SPEC_AUG = True
+MIX_AUG = False  # aumentos de "master comercial" (_mix_aug); 26-11 en prueba
 WEIGHT_DECAY = 1e-2
 MIN_DIST = 2  # tramas minimas entre dos notas (~46 ms)
 # las notas muy seguidas son las que mas se escapan ("pa-pa-paaam" se quedaba en "pa-paaam"): pesan mas al entrenar
@@ -78,6 +79,23 @@ def _net(n_on: int = len(DIFFS), width: float = 1.0):
             return self.onset(h), self.chord(h), self.move(h), self.lane(h)
 
     return Net()
+
+
+def _mix_aug(x: np.ndarray, tr: list, rng) -> None:
+    """Como suena la guitarra separada de un master comercial (y no de las pistas del juego): se cuela algo de
+    otra cancion, otra dinamica y otra ecualizacion. CQT en 0..1 = -100..0 dB. Las guitarras separadas de Arde
+    Bogota no tienen mas ruido que las del banco (percentil 50: 0,63-0,75 frente a 0,73-0,76), asi que sin ruido."""
+    q = x[:84]
+    if rng.random() < 0.5:  # fuga de otros instrumentos: otra pista 10-25 dB por debajo (en dB, sumar ~ maximo)
+        o = tr[int(rng.integers(len(tr)))]["x"]
+        s = int(rng.integers(0, o.shape[1] - CROP + 1))
+        np.maximum(q, o[:84, s:s + CROP].astype(np.float32) / 255.0 - rng.uniform(0.10, 0.25), out=q)
+    if rng.random() < 0.5:  # mas o menos diferencia entre lo fuerte y lo flojo
+        m = float(q.max())
+        q[:] = m - (m - q) * rng.uniform(0.85, 1.15)
+    if rng.random() < 0.5:  # ecualizacion suave cualquiera (no solo inclinada)
+        q += np.interp(np.arange(84), np.linspace(0, 83, 6), rng.normal(0, 0.06, 6))[:, None]
+    np.clip(q, 0, 1, out=q)
 
 
 def _inputs(cqt: np.ndarray, onset: np.ndarray) -> np.ndarray:
@@ -423,6 +441,8 @@ def train(minutes: float = 40, log=print, width: float = 1.0, batch_size: int = 
                     w = int(rng.integers(2, 9))
                     f0 = int(rng.integers(0, 84 - w))
                     x[f0:f0 + w] = 0
+            if MIX_AUG:
+                _mix_aug(x, tr, rng)
             xs.append(x)
             ons.append(it["on"][s:s + CROP].astype(np.float32))
             chs.append(it["ch"][s:s + CROP].astype(np.int64))

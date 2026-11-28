@@ -39,10 +39,24 @@ CHORD_LONG_STRUM = True  # nota larga en la que suenan varias notas (rasgueo que
 LANE_NEURAL_DEBIAS = True
 LANE_SPREAD = 0.8  # en frases de pocas notas distintas, cuanto se abren los botones por cada semitono
 LANE_NEURAL_MOVE = 7.0
-LANE_NEURAL_LANE = 2.0
+LANE_NEURAL_LANE = 3.5  # 26-11, con LANE_MOVE_DEBIAS: banco movimiento guitarra expert 0,710 -> 0,721, hard 0,676 -> 0,710
+LANE_PRIOR_W = 0.6  # peso del reparto de botones de los charts oficiales
+LANE_SAME_PITCH = 3.0  # coste de cambiar de boton cuando la nota no cambia
+LANE_MOVE_LOCK = 0.0  # >0: si el modelo esta asi de seguro de baja/repite/sube, el Viterbi no puede hacer otra cosa (0,34 = siempre lo que diga el modelo)
+LANE_MOVE_DEBIAS = 1.0  # 0 = no; 1 = la media de baja/repite/sube del modelo en la cancion pasa a MOVE_PRIOR
+MOVE_PRIOR = (0.355, 0.29, 0.355)  # baja / repite / sube en los charts oficiales (repite mediana 0,29)
+BTN_PHRASE = False  # guitarra: boton y movimiento de cada nota del modelo por frases (neural_buttons) en vez del de notas
+BTN_PHRASE_MIX = 1.0  # peso del modelo por frases frente al de notas (media geometrica; 1 = solo el de frases)
+BTN_PHRASE_DEBIAS = True  # con el modelo por frases, aplicar tambien las dos correcciones de la cancion
 LOWER_LANES = "learned"  # botones de Dificil/Medio/Facil: "learned" (modelo de dificultades) o "scaled" (los de Experto comprimidos)
 REDUCE_NEURAL = 0.5  # peso del modelo neuronal al decidir que notas quedan en Dificil, Medio y Facil (0 = no)
-REDUCE_NEURAL_THR_ADD = 0.0  # mas alto = menos notas en las dificultades bajas
+REDUCE_NEURAL_GUITAR = 0.75  # solo guitarra (27-11 banco F1: dificil 0,7637 -> 0,7669, medio 0,687 -> 0,710; en el bajo 0,75 empeoraba)
+REDUCE_NEURAL_THR_ADD = -0.1  # mas alto = menos notas en las dificultades bajas (27-11 banco: 0 -> -0,1 F1 guitarra medio 0,710 -> 0,725, facil 0,590 -> 0,617, bajo medio 0,761 -> 0,772; notas frente al oficial 0,95 -> 1,06 en medio; -0,15 se pasaba)
+REDUCE_ADD_HARD = 0.0  # lo mismo, solo en Dificil
+REDUCE_ADD_MEDIUM = 0.0  # solo en Medio
+REDUCE_ADD_EASY = 0.0  # solo en Facil
+REDUCE_ADD_HARD_GUITAR = 0.0  # solo en Dificil de la guitarra
+REDUCE_ADD_EASY_GUITAR = -0.1  # solo en Facil de la guitarra (27-11 banco F1 0,617 -> 0,647, notas frente al oficial 0,85 -> 0,92; Plug In Baby salia casi vacio)
 # partes repetidas (estribillos, riffs que vuelven): se oyen juntas (media de todas las veces que suenan) y
 # cada repeticion copia las notas de la primera vez, como en los charts oficiales
 REPEAT_AVERAGE = True
@@ -201,7 +215,8 @@ def build_events_neural(notes: list[Note], sa: StemAnalysis, net, beats: np.ndar
     model, info = net
     spec = compact_spectrum(sa)
     nets = load_models() or [net]
-    prob_all, chord_p, move_p, lane_p = predict_all(nets, _inputs(spec["cqt"], spec["onset"]))
+    x_in = _inputs(spec["cqt"], spec["onset"])
+    prob_all, chord_p, move_p, lane_p = predict_all(nets, x_in)
     buttons = any("botones" in i for _, i in nets)
     if canon is not None and beats is not None:
         from .repeats import average_frames
@@ -244,6 +259,10 @@ def build_events_neural(notes: list[Note], sa: StemAnalysis, net, beats: np.ndar
         if buttons:
             events[-1].extra["nn_move"] = move_p[fr].tolist()
             events[-1].extra["nn_lane"] = lane_p[fr].tolist()
+            if BTN_PHRASE and instrument == "guitar":
+                from ..calibration.neural_buttons import note_features
+
+                events[-1].extra["nfeat"] = note_features(x_in, (prob_all, chord_p, move_p, lane_p), [fr])[0]
     for a, b in zip(events, events[1:]):
         a.end = min(a.end, b.time)
     return events
@@ -645,8 +664,21 @@ def _assign_lanes(events: list[Event], sizes: list[int], key: str, targets: dict
     """Asigna carriles por frase con programacion dinamica (respeta el contorno melodico)."""
     lane_prior = np.array(stat_list(f"{key}.expert.lanes", [0.24, 0.23, 0.24, 0.19, 0.10])[:5])
     lane_prior = lane_prior / lane_prior.sum()
-    prior_cost = -np.log(lane_prior + 1e-3) * 0.6
+    prior_cost = -np.log(lane_prior + 1e-3) * LANE_PRIOR_W
     cache: dict[tuple, list[int]] = {}
+    if debias and BTN_PHRASE and key == "guitar" and events and all("nfeat" in e.extra for e in events):
+        from ..calibration import neural_buttons as nb
+
+        net = nb.load_model()
+        if net is not None:
+            X = nb.build(np.array([e.time for e in events]), np.array([e.extra["nfeat"] for e in events]), sizes)
+            pl, pm = nb.predict(net, X)
+            w = BTN_PHRASE_MIX
+            for e, a, b in zip(events, pl, pm):
+                a = a ** w * np.asarray(e.extra["nn_lane"]) ** (1 - w)
+                b = b ** w * np.asarray(e.extra["nn_move"]) ** (1 - w)
+                e.extra["nn_lane"], e.extra["nn_move"] = (a / a.sum()).tolist(), (b / b.sum()).tolist()
+            debias = BTN_PHRASE_DEBIAS
     if debias and LANE_NEURAL_DEBIAS and events and all("nn_lane" in e.extra for e in events):
         # el modelo tiende a ir al centro (en la duda, rojo o amarillo): se corrige con lo que usa en toda la
         # cancion y se lleva al reparto de botones de los charts oficiales
@@ -655,6 +687,14 @@ def _assign_lanes(events: list[Event], sizes: list[int], key: str, targets: dict
         adj = adj / adj.sum(1, keepdims=True)
         for e, a in zip(events, adj):
             e.extra["nn_lane"] = a.tolist()
+    if debias and LANE_MOVE_DEBIAS and events and all("nn_move" in e.extra for e in events):
+        # en mezclas que no se parecen a las de entrenamiento el modelo dice "repite" casi siempre (Arde Bogota:
+        # 43-93 % cuando cambia la nota, oficiales 4-9 %): se lleva su media de la cancion a la de los oficiales
+        M = np.array([e.extra["nn_move"] for e in events])
+        adj = M * (np.array(MOVE_PRIOR) / (M.mean(0) + 1e-3)) ** LANE_MOVE_DEBIAS
+        adj = adj / adj.sum(1, keepdims=True)
+        for e, a in zip(events, adj):
+            e.extra["nn_move"] = a.tolist()
     for ph in _phrases(events):
         roots = [events[i].root for i in ph]
         sig = tuple(r - roots[0] for r in roots) + tuple(sizes[i] for i in ph) + (roots[0] % 12,)
@@ -739,7 +779,7 @@ def _viterbi_lanes(roots: list[int], sizes: list[int], prior_cost: np.ndarray,
                     continue
                 dl = l - k
                 if dp == 0:
-                    t = 0.0 if dl == 0 else 3.0 + abs(dl)
+                    t = 0.0 if dl == 0 else LANE_SAME_PITCH + abs(dl)
                 else:
                     t = 0.0
                     if np.sign(dl) != np.sign(dp):
@@ -748,6 +788,9 @@ def _viterbi_lanes(roots: list[int], sizes: list[int], prior_cost: np.ndarray,
                 if nn_move is not None and LANE_NEURAL_MOVE:
                     # lo que oye el modelo neuronal: si esta nota sube, baja o repite respecto a la anterior
                     t += -np.log(nn_move[i][int(np.sign(dl)) + 1] + 1e-3) * LANE_NEURAL_MOVE
+                if (nn_move is not None and LANE_MOVE_LOCK and max(nn_move[i]) >= LANE_MOVE_LOCK
+                        and int(np.sign(dl)) + 1 != int(np.argmax(nn_move[i]))):
+                    t += 50.0
                 c = cost[i - 1, k] + t
                 if c < best:
                     best, arg = c, k
@@ -833,29 +876,32 @@ REDUCE = {
     "medium": (0.5, 0.18, 4, 2, 0.45, True),
     "easy": (0.5, 0.30, 3, 1, 0.0, True),
 }
+REDUCE_GUITAR = dict(REDUCE)  # lo mismo solo para la guitarra (lo que cambie aqui no toca al bajo)
+# 27-11 banco: Dificil de guitarra con 0,105 s de separacion minima F1 0,773 -> 0,778, mov 0,725 -> 0,731 (5 mejor, 0 peor)
+REDUCE_GUITAR["hard"] = (0.25, 0.105, 5, 2, 0.75, False)
 
 
 def _reduce_learned(expert: list[FretNote], tm: TempoMap, diff: str, models: dict,
-                    events: list[Event] | None = None) -> list[FretNote] | None:
+                    events: list[Event] | None = None, w: float = REDUCE_NEURAL, guitar: bool = False) -> list[FretNote] | None:
     """Reduccion con el modelo aprendido de los charts de referencia (que notas quedan y en que carril)."""
     from ..calibration.reducer_model import MAX_LANE, note_features
 
-    min_beats, min_secs, max_lanes, max_chord, chord_keep, strum_only = REDUCE[diff]
+    min_beats, min_secs, max_lanes, max_chord, chord_keep, strum_only = (REDUCE_GUITAR if guitar else REDUCE)[diff]
     m = models.get(diff)
     if not m or len(expert) < 8:
         return None
     X = note_features(expert, tm)
     p_keep = m["keep"].predict_proba(X)[:, 1]
     thr = REDUCE_THR[diff]
-    if REDUCE_NEURAL and events and len(events) == len(expert) and all("nn_diff" in e.extra for e in events):
+    if w and events and len(events) == len(expert) and all("nn_diff" in e.extra for e in events):
         # el modelo neuronal oye la cancion: sabe que golpes destacan y cuales son relleno
         from ..calibration.neural_onset import DIFFS
 
         k = DIFFS.index(diff) - 1
         nn_thr = events[0].extra.get("nn_thr", {}).get(diff, 0.5)
         pn = np.array([e.extra["nn_diff"][k] for e in events])
-        p_keep = (1 - REDUCE_NEURAL) * p_keep + REDUCE_NEURAL * pn
-        thr = (1 - REDUCE_NEURAL) * thr + REDUCE_NEURAL * nn_thr + REDUCE_NEURAL_THR_ADD
+        p_keep = (1 - w) * p_keep + w * pn
+        thr = (1 - w) * thr + w * nn_thr + REDUCE_NEURAL_THR_ADD + {"hard": REDUCE_ADD_HARD + (REDUCE_ADD_HARD_GUITAR if guitar else 0.0), "medium": REDUCE_ADD_MEDIUM, "easy": REDUCE_ADD_EASY + (REDUCE_ADD_EASY_GUITAR if guitar else 0.0)}[diff]
     # primera nota tras un silencio: siempre
     for i, n in enumerate(expert):
         if i == 0 or n.tick - expert[i - 1].tick >= RES * 2:
@@ -898,7 +944,10 @@ def _reduce(expert: list[FretNote], events: list[Event], tm: TempoMap, diff: str
         return []
     from ..calibration.reducer_model import load_models
 
-    learned = _reduce_learned(expert, tm, diff, load_models(), events)
+    models = load_models()
+    models = models.get("by_key", {}).get(key, models)  # modelo propio del instrumento si existe
+    learned = _reduce_learned(expert, tm, diff, models, events,
+                              REDUCE_NEURAL_GUITAR if key == "guitar" else REDUCE_NEURAL, key == "guitar")
     if learned is not None:
         out = learned
         # en las dificultades faciles una nota larga tiene que serlo de verdad (en tu biblioteca, el largo

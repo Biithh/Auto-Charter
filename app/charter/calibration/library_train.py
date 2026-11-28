@@ -27,6 +27,7 @@ import numpy as np
 from .. import paths
 
 TRAIN_DIR = paths.CONFIG_DIR / "entrenamiento"
+REDUCER_VERSION = "|v2-por-instrumento"  # 27-11: la guitarra tiene su propio modelo de dificultades
 # v2: guarda los tiempos de ataques y notas (las etiquetas se recalculan al entrenar). La carpeta "audio" antigua
 # tenia etiquetas con un desfase que hacia que el modelo pusiera pocas notas: se borra
 AUDIO_CACHE = TRAIN_DIR / "audio_v2"
@@ -113,7 +114,8 @@ class Trainer:
         tmpdir = _link_dir(sub)
         self.progress("Modelo de dificultades", 0.6)
         mk = TRAIN_DIR / "dificultad_frets.txt"
-        if mk.exists() and mk.read_text(encoding="utf-8") == sig and (paths.CONFIG_DIR / "reducer.pkl").exists():
+        sig_f = sig + REDUCER_VERSION  # si cambia el modelo de dificultades, se reentrena aunque las canciones sean las mismas
+        if mk.exists() and mk.read_text(encoding="utf-8") == sig_f and (paths.CONFIG_DIR / "reducer.pkl").exists():
             self.log("  modelo de dificultades (guitarra/bajo/teclado) ya entrenado con estas canciones: se reutiliza")
         else:
             self.log(f"  entrenando el modelo de dificultades (guitarra/bajo/teclado) con {len(sub)} canciones...")
@@ -124,8 +126,8 @@ class Trainer:
                 if counter["n"] % 250 == 0:
                     self.log(f"    {counter['n']}/{len(sub)} charts preparados")
 
-            reducer_model.save(reducer_model.train(str(tmpdir), log=tick), paths.CONFIG_DIR / "reducer.pkl")
-            mk.write_text(sig, encoding="utf-8")
+            reducer_model.save(reducer_model.train(str(tmpdir), log=tick, by_key=True), paths.CONFIG_DIR / "reducer.pkl")
+            mk.write_text(sig_f, encoding="utf-8")
         self.progress("Modelo de dificultades", 0.8)
         mk = TRAIN_DIR / "dificultad_bateria.txt"
         if "drums" not in self.active:

@@ -71,7 +71,7 @@ def _collect(folder: str, log=print):
     from ..songini import read_ini
     from .reference import OFFICIAL_CHARTERS, find_songs
 
-    data = {d: {"X": [], "keep": [], "lane": [], "chord": [], "w": [], "g": []} for d in DIFFS}
+    data = {d: {"X": [], "keep": [], "lane": [], "chord": [], "w": [], "g": [], "k": []} for d in DIFFS}
     rng = np.random.default_rng(0)
     for gi, f in enumerate(find_songs(folder)):
         try:
@@ -101,6 +101,7 @@ def _collect(folder: str, log=print):
                 dd["chord"].append(chord[sel])
                 dd["w"].append(np.full(len(sel), 2.0 if official else 1.0))
                 dd["g"].append(np.full(len(sel), gi))
+                dd["k"].append(np.full(len(sel), key))
         log(f"  {f.name}")
     for d in DIFFS:
         for k in data[d]:
@@ -112,11 +113,27 @@ def _lane_features(X: np.ndarray) -> np.ndarray:
     return X
 
 
-def train(folder: str, log=print, evaluate: bool = False) -> dict:
+# modelos propios por instrumento (ademas del comun, que sirve para el resto). 27-11 banco: la guitarra con el
+# suyo (guitarra+ritmo, toda la biblioteca) F1 dificil 0,771 -> 0,773, medio 0,725 -> 0,730, facil 0,647 -> 0,664;
+# el bajo con el suyo empeoraba en Facil, asi que sigue con el comun
+BY_KEY = {"guitar": ("guitar", "rhythm")}
+
+
+def train(folder: str, log=print, evaluate: bool = False, by_key: bool = False, data: dict | None = None) -> dict:
+    data = data or _collect(folder, log)
+    models = _fit(data, log, evaluate)
+    if by_key:
+        models["by_key"] = {}
+        for name, keys in BY_KEY.items():
+            sub = {d: {k: v[np.isin(data[d]["k"], keys)] for k, v in data[d].items()} for d in DIFFS}
+            models["by_key"][name] = _fit(sub, log, evaluate)
+    return models
+
+
+def _fit(data: dict, log=print, evaluate: bool = False) -> dict:
     from sklearn.ensemble import HistGradientBoostingClassifier
     from sklearn.model_selection import GroupKFold
 
-    data = _collect(folder, log)
     models = {}
     for d in DIFFS:
         dd = data[d]

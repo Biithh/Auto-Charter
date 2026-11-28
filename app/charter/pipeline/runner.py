@@ -435,8 +435,9 @@ def _anchor_times(trans: dict) -> np.ndarray:
 
 
 def _keys_audio(stems: dict, sr: int, work: Path) -> None:
-    """Muchos teclados son sintetizadores y la separacion los deja en "other": lo que oye el modelo de teclado (y lo
-    que suena como keys.ogg) es entonces piano + resto. Sin modelo entrenado se queda solo el piano."""
+    """Muchos teclados son sintetizadores y la separacion los deja en "other": lo que oye el modelo de teclado es
+    entonces piano + resto. Sin modelo entrenado se queda solo el piano. keys.ogg sigue siendo solo el piano
+    ("piano_solo"): si llevara el resto, al fallar una nota de teclado se callarian tambien otros sonidos."""
     from ..calibration.neural_keys import MODEL_PATH, USE_MIX
 
     if not (USE_MIX and MODEL_PATH.exists() and "other" in stems):
@@ -446,6 +447,7 @@ def _keys_audio(stems: dict, sr: int, work: Path) -> None:
         a, b = load(stems["piano"])[0], load(stems["other"])[0]
         n = min(a.shape[1], b.shape[1])
         save(path, a[:, :n] + b[:, :n], sr)
+    stems["piano_solo"] = stems["piano"]
     stems["piano"] = path
 
 
@@ -764,7 +766,7 @@ def _export_audio(stems, mix, sr, used, out_dir: Path, lead_in: float, rep: Repo
     rest = mix.copy()
     tmp = out_dir / "_tmp.wav"
     for i, s in enumerate(used):
-        a, _ = load(stems[s])
+        a, _ = load(stems["piano_solo"] if s == "piano" and "piano_solo" in stems else stems[s])
         n = min(a.shape[1], rest.shape[1])
         rest[:, :n] -= a[:, :n]
         save(tmp, a, sr)

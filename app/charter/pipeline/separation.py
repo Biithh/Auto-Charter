@@ -23,6 +23,9 @@ VOCAL_MODELS = ("vocals_mel_band_roformer.ckpt", "melband_roformer_big_beta4.ckp
 SIX_STEM_MODEL = "BS-Roformer-SW.ckpt"
 KARAOKE_MODEL = "mel_band_roformer_karaoke_becruily.ckpt"
 DRUMSEP_MODEL = "MDX23C-DrumSep-aufr33-jarredou.ckpt"
+# separar en media precision: 26-11, Dangerous 544 -> 295 s, pistas a 53-74 dB de las de precision normal;
+# banco (10 canciones): guitarra F1 0,8127 vs 0,8128, mov 0,740 vs 0,739, bajo igual
+SEP_AUTOCAST = True
 ALL_MODELS = VOCAL_MODELS + (SIX_STEM_MODEL, KARAOKE_MODEL, DRUMSEP_MODEL)
 SIX_STEMS = ("vocals", "drums", "bass", "guitar", "piano", "other")
 DRUM_PARTS = ("kick", "snare", "toms", "hh", "ride", "crash")
@@ -63,9 +66,17 @@ def _run_model(model: str, src: Path, out_dir: Path, log) -> dict[str, Path]:
         if all(p.exists() for p in cached.values()):
             log(f"  (reutilizando resultado guardado de {model})")
             return cached
-    sep = _separator(tmp, log)
+    sep = _separator(tmp, log, autocast=SEP_AUTOCAST)
     sep.load_model(model_filename=model)
     files = sep.separate(str(src))
+    if SEP_AUTOCAST and not all(np.isfinite(load(f if Path(f).is_absolute() else tmp / f)[0]).all() for f in files):
+        # la media precision a veces da NaN: se repite ese modelo en precision normal
+        log(f"Aviso: {model} salio mal en media precision; se repite en precision normal")
+        del sep
+        _free_gpu()
+        sep = _separator(tmp, log)
+        sep.load_model(model_filename=model)
+        files = sep.separate(str(src))
     out = {}
     for f in files:
         p = Path(f)

@@ -20,7 +20,15 @@ from ..songini import read_ini
 OFFICIAL_CHARTERS = ("harmonix", "neversoft", "activision", "vicarious", "budcat", "pandemic", "beenox", "freestylegames")
 
 
-def find_songs(folder: str | Path, limit: int | None = None):
+def _made_by_charter(song_dir: Path) -> bool:
+    """Charts hechos por este programa: no se aprende de ellos (seria aprender de nuestros propios fallos)."""
+    try:
+        return "charter (ia)" in (song_dir / "song.ini").read_text(encoding="utf-8", errors="ignore").lower()
+    except OSError:
+        return False
+
+
+def find_songs(folder: str | Path, limit: int | None = None, skip_ai: bool = True):
     """Busca carpetas con notes.mid o notes.chart + song.ini (recursivo, sin repetir)."""
     import os
 
@@ -29,7 +37,7 @@ def find_songs(folder: str | Path, limit: int | None = None):
     if folder.is_file():
         # lista de carpetas (una por linea)
         for line in folder.read_text(encoding="utf-8").splitlines():
-            if line.strip():
+            if line.strip() and not (skip_ai and _made_by_charter(Path(line.strip()))):
                 yield Path(line.strip())
                 count += 1
                 if limit and count >= limit:
@@ -38,6 +46,8 @@ def find_songs(folder: str | Path, limit: int | None = None):
     for root, _dirs, files in os.walk(folder):
         low = {f.lower() for f in files}
         if ("notes.mid" in low or "notes.chart" in low) and "song.ini" in low:
+            if skip_ai and _made_by_charter(Path(root)):
+                continue
             yield Path(root)
             count += 1
             if limit and count >= limit:
