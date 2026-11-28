@@ -37,11 +37,9 @@ On this PC, a song of about 3 minutes takes about 17 minutes. I don't know the m
 
 More details (in Spanish) in [LEEME.txt](LEEME.txt).
 
-## Rules: personal use only
+## Sharing charts
 
-**Charts made with Charter are only for you.** You can't publish, upload or share them anywhere, not even for free: no chart websites, Discord, Reddit, forums, links or song packs. Charter is meant to play songs nobody has charted, not to fill the places where people share hand-made charts. If you want a song charted well, there are charters who do it by hand.
-
-Every chart it makes is marked as `Charter (IA)` in its `song.ini`, so sites and servers can spot and filter them.
+You can share the charts you make with Charter. Every chart it makes is marked as `Charter (IA)` in its `song.ini`, so people know it was made automatically.
 
 Only use songs you have the right to use. Full terms in [LICENSE](LICENSE).
 
@@ -88,14 +86,12 @@ Con este PC, una canción de unos 3 minutos tarda unos 17 minutos. No sé cuál 
 
 Más detalles en [LEEME.txt](LEEME.txt).
 
-## Normas: solo para uso personal
+## Compartir los charts
 
-**Los charts que hace Charter son solo para ti.** No puedes publicarlos, subirlos ni compartirlos en ningún sitio, ni gratis: ni webs de charts, ni Discord, ni Reddit, ni foros, ni enlaces, ni packs. Charter sirve para jugar canciones que nadie ha charteado, no para llenar los sitios donde la gente comparte charts hechos a mano. Si quieres una canción bien charteada, hay charters que lo hacen a mano.
-
-Todos los charts salen marcados como `Charter (IA)` en su `song.ini`, para que las webs y los servidores puedan detectarlos y filtrarlos.
+Puedes compartir los charts que hagas con Charter. Todos salen marcados como `Charter (IA)` en su `song.ini`, para que se sepa que están hechos automáticamente.
 
 Usa solo canciones que tengas derecho a usar. Las condiciones completas están en [LICENSE](LICENSE).
 
 ## License / Licencia
 
-Charter License (see [LICENSE](LICENSE)). Free to use and modify; generated charts are for personal use only. / Uso y modificación gratis; los charts generados son solo para uso personal. Version 0.1 was released under MIT. / La versión 0.1 salió con licencia MIT.
+Charter License (see [LICENSE](LICENSE)). Free to use and modify; you can share the charts you make. / Uso y modificación gratis; puedes compartir los charts que hagas. Version 0.1 was released under MIT. / La versión 0.1 salió con licencia MIT.

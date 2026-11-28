@@ -41,13 +41,6 @@ EN = {
     "Arrastra aquí tus canciones (mp3, flac, wav, m4a...)\no pulsa «Añadir canciones» o «Añadir de YouTube»":
         "Drag your songs here (mp3, flac, wav, m4a...)\nor press \"Add songs\" or \"Add from YouTube\"",
     "Charter {} — charts para YARG y Clone Hero": "Charter {} — charts for YARG and Clone Hero",
-    "Normas de uso": "Rules of use",
-    "Los charts que genera Charter son solo para tu uso personal.\n\nNo puedes publicarlos, subirlos ni "
-    "repartirlos de ninguna forma, ni gratis: ni webs de charts, ni Discord, ni Reddit, ni foros, ni enlaces, "
-    "ni packs.\n\nUsa solo canciones que tengas derecho a usar. Condiciones completas en LICENSE.":
-        "Charts made with Charter are for your personal use only.\n\nYou may not publish, upload or share them "
-        "in any way, not even for free: no chart websites, Discord, Reddit, forums, links or song packs.\n\n"
-        "Only use songs you have the right to use. Full terms in LICENSE.",
     "Convierte tus canciones en charts jugables para YARG / Clone Hero: guitarra, rítmica, bajo, batería, "
     "teclado, Pro Keys y voz, en Fácil, Medio, Difícil y Experto.":
         "Turns your songs into playable charts for YARG / Clone Hero: guitar, rhythm, bass, drums, keys, "

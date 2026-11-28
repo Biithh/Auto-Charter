@@ -1,11 +1,9 @@
 CHARTER - Charts jugables para YARG y Clone Hero a partir de tus canciones
 ==========================================================================
 
-NORMAS: SOLO PARA USO PERSONAL
-  Los charts que genera Charter son solo para ti. NO puedes publicarlos, subirlos ni
-  repartirlos de ninguna forma, ni gratis: ni webs de charts, ni Discord, ni Reddit, ni
-  foros, ni enlaces, ni packs. Todos salen marcados como "Charter (IA)" en el song.ini.
-  Usa solo canciones que tengas derecho a usar. Condiciones completas en LICENSE.
+COMPARTIR LOS CHARTS
+  Puedes compartir los charts que genera Charter. Todos salen marcados como "Charter (IA)"
+  en el song.ini. Usa solo canciones que tengas derecho a usar. Condiciones en LICENSE.
 
 INSTALAR (solo la primera vez)
   1. Doble clic en "Instalar Charter.bat".
